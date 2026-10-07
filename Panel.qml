@@ -516,11 +516,11 @@ Panel {
   }
 
   // ---- Display settings (shell.json, set from the gear view) ----
-  // Roomy is the shell's stock panel size; the others shrink spacing and, half
+  // Roomy is a little under the shell's stock panel size; the others shrink spacing and, half
   // as fast, text, so Compact stays readable. The font size scales text on top.
   readonly property string density: String(setting("density", "normal"))
   readonly property string fontSize: String(setting("fontSize", "normal"))
-  readonly property real densityScale: density === "compact" ? 0.65 : (density === "roomy" ? 1.0 : 0.8)
+  readonly property real densityScale: density === "compact" ? 0.5 : (density === "roomy" ? 0.8 : 0.65)
   readonly property real fontScale: (0.5 + 0.5 * densityScale)
     * (fontSize === "small" ? 0.9 : (fontSize === "large" ? 1.1 : 1.0))
   readonly property real fontDisplay: Math.round(Style.font.display * fontScale)
