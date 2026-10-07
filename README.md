@@ -55,6 +55,7 @@ hyprchroma --force                # rewrite everything
 hyprchroma --target=gtk --force   # gtk | qt-kde | dark-reader | flatpak | browsers
 hyprchroma framework remove flatpak  # remove from the panel and revert
 hyprchroma framework restore flatpak # put it back and sync
+hyprchroma --set-accent=blue      # theme | blue | cyan | green | magenta | yellow | red | orange
 hyprchroma palette --capture      # pin the current palette to a file
 hyprchroma restore --stock        # revert everything to stock defaults
 ```
@@ -77,6 +78,10 @@ With the bar widget:
   same way, counting the update as one, and the panel's Update button is lit
   in that color until it is run.
 * Turning a framework off reverts it to its original state.
+* The accent color synchronized apps use follows your theme by default. Pick a
+  color from the theme's palette in the panel's settings (the gear), or run
+  `hyprchroma --set-accent=<name>`; `--set-accent=theme` goes back to following
+  the theme. It does not change the panel's own look.
 * Removing one hides it from the panel entirely (press `/` and its number to restore).
 * GTK and Qt/KDE are always included; Dark Reader, Flatpak apps and
   Additional browsers are optional. Install the Dark Reader browser extension
