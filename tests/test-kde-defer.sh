@@ -15,7 +15,6 @@ mkdir -p "$ROOT/lib" "$ROOT/bin" "$ROOT/share/hooks"
 cp "$REPO"/lib/* "$ROOT/lib/"
 cp "$REPO/bin/hyprchroma" "$ROOT/bin/hyprchroma"
 cp "$REPO/share/hooks/hyprchroma" "$ROOT/share/hooks/hyprchroma"
-cp "$REPO/share/pear-theme.css.template" "$ROOT/share/"
 cat > "$ROOT/lib/hyprchroma-state" <<'E'
 #!/usr/bin/env bash
 prev=""

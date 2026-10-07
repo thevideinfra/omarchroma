@@ -115,17 +115,6 @@ you are not left with a panel offering things you do not use.
 INTRO
 
 # --- the optional frameworks ----------------------------------------------
-head2 "Pear Desktop"
-cat <<'PEAR'
-Pear Desktop is a desktop app for YouTube Music. Hyprchroma can generate a
-stylesheet for it so its window matches your theme instead of staying black
-regardless of what the rest of the desktop looks like.
-
-Only useful if you actually use it. Nothing else depends on this.
-PEAR
-want_pear=no
-if ask "Include Pear Desktop"; then want_pear=yes; fi
-
 head2 "Dark Reader"
 cat <<'DR'
 Dark Reader is a browser extension that darkens web pages. Hyprchroma can push
@@ -224,34 +213,6 @@ else
   note "Everything needed is already installed."
 fi
 
-# Pear Desktop itself is not a dependency in the sense above -- it is the
-# application being themed, not something this needs to run -- and it has no
-# package in the official repos to hand to pacman the way the others above
-# do. Same check bin/hyprchroma itself uses to decide whether Pear is worth
-# syncing at all, so this offers exactly when that would otherwise find
-# nothing to theme. pear-desktop-bin, not pear-desktop: both provide the same
-# pear-desktop binary the check above looks for, but the plain package builds
-# a full Electron app from source on install -- heavy enough, live on this
-# project's own 7.2GB test machine, to have pushed the whole session into
-# swap and taken the terminal down with it. -bin skips that build entirely.
-if [[ $want_pear == yes ]] && ! command -v pear-desktop >/dev/null &&
-   [[ ! -d "$HOME/.config/YouTube Music" ]]; then
-  say ""
-  note "Pear Desktop is not installed."
-  say "  omarchy pkg aur add pear-desktop-bin"
-  say ""
-  if ask "Install it now"; then
-    if command -v omarchy >/dev/null; then
-      omarchy pkg aur add pear-desktop-bin ||
-        note "Could not install pear-desktop-bin; you can run the command above later."
-    else
-      note "\"omarchy\" was not found, so this cannot be run for you; use the command above."
-    fi
-  else
-    note "Skipped. The panel will still offer Pear Desktop once you install it yourself."
-  fi
-fi
-
 # --- consent, then build --------------------------------------------------
 head2 "What this installs"
 cat <<CONSENT
@@ -329,7 +290,6 @@ makepkg -si --needed || { say "The build did not finish; nothing else was change
 
 # --- apply the choices, now that the tool exists --------------------------
 head2 "Applying your choices"
-[[ $want_pear == yes ]] || hyprchroma framework remove pear
 [[ $want_dark == yes ]] || hyprchroma framework remove dark-reader
 # Opt-in, so a yes has to switch it on rather than just leave it listed --
 # which "framework restore" does.

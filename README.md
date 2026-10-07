@@ -5,7 +5,7 @@
 **Change your Omarchy theme once and let your desktop follow.**
 
 Omarchroma applies your active palette to GTK 3/4, libadwaita, GNOME settings,
-Qt/KDE Frameworks, Dark Reader, Pear Desktop (YouTube Music), Flatpak apps, and
+Qt/KDE Frameworks, Dark Reader, Flatpak apps, and
 the browsers Omarchy does not theme itself: Firefox, Floorp, Zen, LibreWolf,
 Waterfox and Vivaldi.
 
@@ -44,7 +44,7 @@ this restart, and the Omarchy shell's own, automatically.
 
 | Theme | What it shows |
 |---|---|
-| ![Custom theme synchronized across desktop apps](screenshots/custom-theme.png) | GTK/libadwaita, Qt/KDE surfaces, Dark Reader, and Pear Desktop following a custom palette. |
+| ![Custom theme synchronized across desktop apps](screenshots/custom-theme.png) | GTK/libadwaita, Qt/KDE surfaces, and Dark Reader following a custom palette. |
 | ![Nord theme synchronized across desktop apps](screenshots/nord.png) | The same app set following a Nord palette after a theme change. |
 
 ## Use
@@ -52,9 +52,9 @@ this restart, and the Omarchy shell's own, automatically.
 ```bash
 hyprchroma                        # sync only what changed
 hyprchroma --force                # rewrite everything
-hyprchroma --target=gtk --force   # gtk | qt-kde | dark-reader | pear | flatpak | browsers
-hyprchroma framework remove pear  # remove from the panel and revert
-hyprchroma framework restore pear # put it back and sync
+hyprchroma --target=gtk --force   # gtk | qt-kde | dark-reader | flatpak | browsers
+hyprchroma framework remove flatpak  # remove from the panel and revert
+hyprchroma framework restore flatpak # put it back and sync
 hyprchroma palette --capture      # pin the current palette to a file
 hyprchroma restore --stock        # revert everything to stock defaults
 ```
@@ -78,7 +78,7 @@ With the bar widget:
   in that color until it is run.
 * Turning a framework off reverts it to its original state.
 * Removing one hides it from the panel entirely (press `/` and its number to restore).
-* GTK and Qt/KDE are always included; Dark Reader, Pear Desktop, Flatpak apps and
+* GTK and Qt/KDE are always included; Dark Reader, Flatpak apps and
   Additional browsers are optional. Install the Dark Reader browser extension
   manually for it to theme on the next sync.
 * Dark Reader is themed in every browser profile it is installed in, not only
@@ -120,7 +120,6 @@ stops and changes nothing.
 | `adw-gtk-theme` | GTK 3 applications | GTK 3 apps keep system defaults |
 | `python-plyvel` | Dark Reader in Chromium | Chromium browsers are skipped |
 | [Dark Reader](https://chromewebstore.google.com/detail/dark-reader/eimadpbcbfnmbkopoojfekhnkhdbieeh) | Browser page theming | Web pages won't be themed |
-| [Pear Desktop](https://aur.archlinux.org/packages/pear-desktop-bin) | YouTube Music theming | Setup offers to install it from the AUR |
 | `flatpak` | Flatpak app theming | Not offered |
 | Firefox, Floorp, Zen, LibreWolf, Waterfox or Vivaldi | Additional browsers | Not offered |
 
@@ -154,7 +153,6 @@ Generated output is never included in backups.
 ~/.config/gtk-{3,4}.0/gtk.css          one @import line, nothing else
 ~/.config/kdeglobals                   only the color sections
 ~/.config/*rc                          only [UiSettings] ColorScheme
-~/.config/YouTube Music/hyprchroma.css
 ~/.local/share/color-schemes/Hyprchroma.colors
 ~/.local/{share,state}/hyprchroma/
 ~/.config/omarchy/hooks/{theme-set,font-set}.d/hyprchroma
@@ -178,7 +176,6 @@ local om = "omarchy-shell io.github.nobledoodle.omarchroma"
 o.bind("SUPER + ALT + G", "Omarchroma: toggle GTK", om .. " toggleGtk")
 o.bind("SUPER + ALT + K", "Omarchroma: toggle Qt/KDE", om .. " toggleQtKde")
 o.bind("SUPER + ALT + D", "Omarchroma: toggle Dark Reader", om .. " toggleDarkReader")
-o.bind("SUPER + ALT + P", "Omarchroma: toggle Pear Desktop", om .. " togglePear")
 o.bind("SUPER + ALT + F", "Omarchroma: toggle Flatpak apps", om .. " toggleFlatpak")
 o.bind("SUPER + ALT + B", "Omarchroma: toggle additional browsers", om .. " toggleBrowsers")
 o.bind("SUPER + ALT + R", "Omarchroma: refresh", om .. " refresh")

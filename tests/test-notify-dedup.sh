@@ -25,7 +25,6 @@ cp "$REPO"/lib/hyprchroma-* "$ROOT/lib/" 2>/dev/null
 cp "$REPO"/lib/sync-* "$ROOT/lib/"
 cp "$REPO/bin/hyprchroma" "$ROOT/bin/hyprchroma"
 cp "$REPO/share/hooks/hyprchroma" "$ROOT/share/hooks/hyprchroma"
-cp "$REPO/share/pear-theme.css.template" "$ROOT/share/"
 
 # STALE_APPS controls what report-stale-apps answers with, so the same fake
 # binary can play "something is stale" and "nothing is" across separate runs.

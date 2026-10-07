@@ -95,14 +95,13 @@ os.environ["PATH"] = trusted_path()
 APP_COLOR_SCHEME_GROUP = "UiSettings"
 APP_COLOR_SCHEME_KEY = "ColorScheme"
 
-TARGETS = ("gtk", "qt-kde", "pear", "flatpak", "browsers")
+TARGETS = ("gtk", "qt-kde", "flatpak", "browsers")
 
 # Which snapshot entries belong to which framework, so a single framework can be
 # reverted on its own when its toggle is switched off.
 TARGET_FILE_KEYS = {
     "gtk": ("gtk3_css", "gtk4_css", "gtk3_hyprchroma_css", "gtk4_hyprchroma_css"),
     "qt-kde": ("kdeglobals", "hyprchroma_colors"),
-    "pear": ("pear_config", "pear_css"),
     "flatpak": (),
     "browsers": (),
 }
@@ -144,7 +143,6 @@ HYPRCHROMA_ONLY_GSETTINGS = ("accent-color", "monospace-font-name")
 STOCK_ABSENT_FILES = {
     "gtk": (".config/gtk-3.0/gtk.css", ".config/gtk-4.0/gtk.css"),
     "qt-kde": (".config/kdeglobals", ".local/share/color-schemes/Hyprchroma.colors"),
-    "pear": (".config/YouTube Music/hyprchroma.css",),
     "flatpak": (),
     "browsers": (),
 }
@@ -507,7 +505,6 @@ GENERATED_PROBES = {
     "gtk4_css": has_hyprchroma_import,
     "kdeglobals": generated_kdeglobals,
     "hyprchroma_colors": always_generated,
-    "pear_css": always_generated,
 }
 
 # Files that are Hyprchroma's in their entirety once a probe recognizes them, so
@@ -516,7 +513,7 @@ GENERATED_PROBES = {
 # header is ours whole; one without it is the user's and is captured normally.
 # gtk.css is the user's: only an import line is added to it, so it is backed
 # up as their file. What is wholly generated is the stylesheet it points at.
-WHOLLY_GENERATED = frozenset({"hyprchroma_colors", "pear_css",
+WHOLLY_GENERATED = frozenset({"hyprchroma_colors",
                               "gtk3_hyprchroma_css", "gtk4_hyprchroma_css"})
 
 # kdeglobals is the one file Hyprchroma shares with its owner: KDE and the user
@@ -639,33 +636,6 @@ def snapshot_file(snapshot_dir, manifest, key, path):
         atomic_write(backup, content, mode=mode)
         entry["backup"] = str(backup.relative_to(snapshot_dir))
     files[key] = entry
-
-
-def strip_generated_pear_themes(snapshot_dir, manifest):
-    """Drop Hyprchroma's stylesheet from the captured Pear config.
-
-    config.json is a genuine user file, so it is always captured; only the entry
-    Hyprchroma appends to options.themes is ours. Removing it from the backup
-    keeps a re-capture from recording our own stylesheet as part of the original.
-    """
-    entry = manifest.get("files", {}).get("pear_config", {})
-    if not entry.get("existed"):
-        return
-    backup = snapshot_dir / entry["backup"]
-    try:
-        config = json.loads(backup.read_text())
-    except (OSError, ValueError, RecursionError):
-        return
-    options = config.get("options") if isinstance(config, dict) else None
-    if not isinstance(options, dict) or not isinstance(options.get("themes"), list):
-        return
-    kept = [theme for theme in options["themes"]
-            if "hyprchroma" not in os.path.basename(str(theme)).lower()]
-    if kept == options["themes"]:
-        return
-    options["themes"] = kept
-    atomic_write(backup, json.dumps(config, indent="\t") + "\n")
-    manifest["captureTainted"] = True
 
 
 def snapshot_gsettings(manifest):
@@ -1707,10 +1677,6 @@ def snapshot(state_dir, data_dir, target):
     elif target == "qt-kde":
         snapshot_file(snapshot_dir, manifest, "kdeglobals", home / ".config/kdeglobals")
         snapshot_file(snapshot_dir, manifest, "hyprchroma_colors", home / ".local/share/color-schemes/Hyprchroma.colors")
-    elif target == "pear":
-        snapshot_file(snapshot_dir, manifest, "pear_config", home / ".config/YouTube Music/config.json")
-        snapshot_file(snapshot_dir, manifest, "pear_css", home / ".config/YouTube Music/hyprchroma.css")
-        strip_generated_pear_themes(snapshot_dir, manifest)
     elif target == "flatpak":
         # Which grants were the user's before this ever added any: a captured
         # revert leaves those alone and removes only the ones added here.
@@ -2835,8 +2801,8 @@ def dark_reader_module():
 
 def event_trigger(state_dir):
     """What a quiet sync compares, in the form it can change without anything
-    else saying so: the palette's source files, the settings, whether Pear
-    Desktop is installed, and where Dark Reader is. A theme or font change runs
+    else saying so: the palette's source files, the settings, and where
+    Dark Reader is. A theme or font change runs
     a sync of its own through Omarchy's hooks; this is for everything else."""
     home = Path.home()
     config = Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config")
@@ -2846,7 +2812,6 @@ def event_trigger(state_dir):
     dark_reader = dark_reader_module()
     return (
         tuple(file_signature(path) for path in files),
-        bool(shutil.which("pear-desktop")) or (home / ".config/YouTube Music").is_dir(),
         dark_reader.targets_signature(dark_reader.dark_reader_targets()),
     )
 
@@ -2979,7 +2944,7 @@ def watch_events(state_dir, data_dir):
 
     After the theme-set hook the changes this service still has to notice -- an
     idle application to recycle now that its window is gone, Dark Reader added
-    to a browser, a newly installed Pear Desktop, an application closing that a
+    to a browser, an application closing that a
     deferred write was waiting on -- all surface on Hyprland's event stream as a
     window opening or closing. Waking on those and passing over them here, with a
     whole sync only when something it compares moved, replaces polling on a
@@ -3120,59 +3085,12 @@ def reauthor_omarchy_gsettings():
     return True
 
 
-def rewrite_pear_themes(chosen):
-    """Replace options.themes in Pear's config.json and nothing else.
-
-    That file also carries window geometry, the current track URL and plugin
-    state, none of which Hyprchroma ever writes. Copying the whole backup over
-    it -- which is what restoring it as a plain file did -- would roll all of
-    that back to whenever the snapshot was taken."""
-    path = Path.home() / ".config/YouTube Music/config.json"
-    if path.is_symlink() or not path.is_file():
-        return
-    try:
-        config = json.loads(read_capped(path) or "")
-    except (ValueError, RecursionError):
-        return
-    options = config.get("options") if isinstance(config, dict) else None
-    if not isinstance(options, dict):
-        return
-    current = options.get("themes")
-    if not isinstance(current, list):
-        current = []
-    wanted = chosen(current)
-    if wanted == current:
-        return
-    options["themes"] = wanted
-    atomic_write(path, json.dumps(config, indent="\t") + "\n")
-
-
-def captured_pear_themes(snapshot_dir, manifest):
-    entry = manifest.get("files", {}).get("pear_config", {})
-    if not entry.get("existed"):
-        return []
-    try:
-        backup = json.loads((snapshot_dir / entry["backup"]).read_text())
-    except (OSError, ValueError, RecursionError):
-        return None
-    options = backup.get("options") if isinstance(backup, dict) else None
-    themes = options.get("themes") if isinstance(options, dict) else None
-    return themes if isinstance(themes, list) else []
-
-
 def restore_target_captured(snapshot_dir, manifest, target):
     for key in TARGET_FILE_KEYS[target]:
-        # Pear's config.json is edited in place rather than copied back whole.
-        if key == "pear_config":
-            continue
         entry = manifest.get("files", {}).get(key)
         if entry is not None:
             restore_file(snapshot_dir, entry)
-    if target == "pear":
-        captured = captured_pear_themes(snapshot_dir, manifest)
-        if captured is not None:
-            rewrite_pear_themes(lambda current: captured)
-    elif target == "gtk":
+    if target == "gtk":
         restore_gsettings(manifest.get("gsettings", {}))
         # Restoring the backup already drops our import, because the backup is
         # the user's own gtk.css from before any of this. Where there was no
@@ -3198,12 +3116,7 @@ def restore_target_stock(snapshot_dir, manifest, target):
     home = Path.home()
     for relative in STOCK_ABSENT_FILES[target]:
         safe_unlink(home / relative)
-    if target == "pear":
-        rewrite_pear_themes(lambda current: [
-            entry for entry in current
-            if "hyprchroma" not in os.path.basename(str(entry)).lower()
-        ])
-    elif target == "gtk":
+    if target == "gtk":
         # Stock means Omarchy's own defaults, which include no import of ours.
         for directory in (".config/gtk-3.0", ".config/gtk-4.0"):
             remove_import(Path.home() / directory / "gtk.css",

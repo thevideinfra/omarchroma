@@ -13,7 +13,7 @@ chk "it parses" "$(bash -n $S 2>&1 && echo ok)" "ok"
 
 # --- what this script itself needs is checked before anything else ---------
 # jq is what the Dark Reader check reads its own answer with, and that check
-# now runs before a single question about Pear or Dark Reader is even asked.
+# now runs before a single question about Dark Reader is even asked.
 # A missing jq there does not fail loudly -- it reads as "not installed" no
 # matter what is true, the same silent-wrong failure this project already hit
 # once from calling the wrong binary path. So this has to run first, and
@@ -34,15 +34,15 @@ chk "it names what is missing and how to get it" \
 # the decline path stops rather than falling through into the real questions.
 chk "declining -- or having nothing to answer with -- stops the script" \
   "$(grep -c 'cannot continue without them' <<<"$base_out")" "1"
-chk "and never reaches a single question about Pear or Dark Reader" \
-  "$(grep -cE 'Include (Pear Desktop|Dark Reader)' <<<"$base_out")" "0"
+chk "and never reaches a single question about Dark Reader" \
+  "$(grep -cE 'Include Dark Reader' <<<"$base_out")" "0"
 chk "declining exits non-zero rather than continuing" \
   "$(timeout 5 "$base_probe" </dev/null >/dev/null 2>&1; echo $?)" "1"
 # Real jq and python are already required just to run this test suite, so the
 # unmodified script never reaches this section at all on the machine running
 # it -- confirmed against $S itself rather than a probe.
 chk "the real script finds nothing missing on this machine" \
-  "$(printf 'n\nn\nno\n' | timeout 30 ./$S 2>&1 | grep -c 'Before anything else')" "0"
+  "$(printf 'n\nno\n' | timeout 30 ./$S 2>&1 | grep -c 'Before anything else')" "0"
 
 # --- sudo's own credential cache is kept warm, not left to expire cold ----
 # A live session on this exact hardware showed a cold prompt -- one that
@@ -71,7 +71,7 @@ chk "the keep-alive is torn down on exit alongside the build directory" \
   "$(grep -c 'kill .\$keepalive_pid. 2>/dev/null' $S)" "1"
 
 # --- nothing is built without the consent we had before --------------------
-out=$(printf 'n\nn\nno\n' | timeout 30 ./$S 2>&1)
+out=$(printf 'n\nno\n' | timeout 30 ./$S 2>&1)
 chk "it asks for the exact acknowledgement" "$(grep -c 'Type "I understand" to continue' <<<"$out")" "1"
 chk "a wrong answer cancels" "$(grep -c 'Setup cancelled; nothing was changed' <<<"$out")" "1"
 # The consent text used to open straight into "built from source and
@@ -113,19 +113,18 @@ chk "the finished package is kept out of the watched tree too" \
 chk "PKGDEST is set before makepkg ever runs, not after" \
   "$(awk '/^export PKGDEST=/{seen=1} /makepkg -si --needed/{print (seen?"before":"after"); exit}' $S)" "before"
 
-# --- both optional frameworks are explained, not just named ---------------
-chk "Pear is explained" "$(grep -c 'desktop app for YouTube Music' <<<"$out")" "1"
+# --- the optional frameworks are explained, not just named ---------------
 chk "Dark Reader is explained" "$(grep -c 'browser extension that darkens web pages' <<<"$out")" "1"
 chk "it says it will not install the extension" \
   "$(grep -c 'does not install the extension' <<<"$out")" "1"
-chk "both are asked about" "$(grep -cE 'Include (Pear Desktop|Dark Reader)' <<<"$out")" "0"
+chk "it is asked about" "$(grep -cE 'Include Dark Reader' <<<"$out")" "0"
 chk "declining is the default" "$(grep -c '\[y/N\]' $S)" "1"
 
 # --- dependencies are scanned, explained, and optional --------------------
 probe=$(mktemp); trap 'rm -f "$probe"' EXIT
 sed 's/adw-gtk-theme/definitely-not-a-package/g; s/python-plyvel/also-not-a-package/g' $S > "$probe"
 chmod +x "$probe"
-want=$(printf 'n\ny\nn\nno\n' | timeout 30 "$probe" 2>&1)
+want=$(printf 'y\nn\nno\n' | timeout 30 "$probe" 2>&1)
 chk "a missing dependency is named" "$(grep -c 'These are missing' <<<"$want")" "1"
 chk "with what it is for" "$(grep -c 'GTK 3 apps follow the theme' <<<"$want")" "1"
 chk "and the command to get it" "$(grep -c 'sudo pacman -S --needed' <<<"$want")" "1"
@@ -133,7 +132,7 @@ chk "declining leaves it uninstalled and says so" \
   "$(grep -c 'installs and runs without them' <<<"$want")" "1"
 
 # Dark Reader's dependency is only relevant if Dark Reader was wanted.
-skip=$(printf 'n\nn\nno\n' | timeout 30 "$probe" 2>&1)
+skip=$(printf 'n\nno\n' | timeout 30 "$probe" 2>&1)
 chk "the Dark Reader dependency is not raised when it was declined" \
   "$(grep -c 'also-not-a-package' <<<"$skip")" "0"
 # Twice: once in the list of what is missing, once in the command to get it.
@@ -153,40 +152,13 @@ chk "the check happens right where the question is answered, not after the build
 # browser happens to be this machine's actual default.
 dr_home=$(mktemp -d); trap 'rm -rf "$dr_home"' EXIT
 dr_out=$(export HOME="$dr_home"
-         printf 'n\ny\nno\n' | timeout 30 "./$S" 2>&1)
+         printf 'y\nno\n' | timeout 30 "./$S" 2>&1)
 chk "the store links appear live, at the point Dark Reader is chosen" \
   "$(grep -c 'Chrome Web Store' <<<"$dr_out")" "1"
 chk "before the build even starts" \
   "$(grep -cE '==> Making package|Finished making' <<<"$dr_out")" "0"
 chk "where it is installed is read from the helper, by its own path" \
   "$(grep -c '"\$here/lib/hyprchroma-dark-reader" --info' $S)" "1"
-
-# --- Pear Desktop is offered for install when wanted and missing ---------
-# A real machine may already have pear-desktop, or a ~/.config/YouTube Music
-# from before -- this one running the suite does, in fact, have both -- so
-# both the command name and HOME are substituted, the same way the
-# dependency probe above fakes a missing adw-gtk-theme.
-pear_probe=$(mktemp); trap 'rm -f "$pear_probe"' EXIT
-sed 's/command -v pear-desktop/command -v definitely-not-pear/' $S > "$pear_probe"
-chmod +x "$pear_probe"
-pear_home=$(mktemp -d); trap 'rm -rf "$pear_home"' EXIT
-# y: include Pear. n: decline Dark Reader, so its dependency never enters it.
-# n: decline the install offer below -- answering yes here would really try
-# to run "omarchy pkg aur add" against this machine. no: cancel before build.
-pear_out=$(export HOME="$pear_home"
-           printf 'y\nn\nn\nno\n' | timeout 30 "$pear_probe" 2>&1)
-chk "a missing, wanted Pear Desktop is named" \
-  "$(grep -c 'Pear Desktop is not installed' <<<"$pear_out")" "1"
-# -bin specifically, not the plain package: that one builds a full Electron
-# app from source, which is what took the terminal down earlier this session.
-chk "with the AUR command to get it, the prebuilt package" \
-  "$(grep -c 'omarchy pkg aur add pear-desktop-bin' <<<"$pear_out")" "1"
-chk "declining leaves it uninstalled and says so" \
-  "$(grep -c 'still offer Pear Desktop once you install it yourself' <<<"$pear_out")" "1"
-# Reuses $out from the top of this file, where Pear was declined outright:
-# nothing about its install state should be checked or printed at all.
-chk "Pear's own check is skipped entirely when it was not wanted" \
-  "$(grep -c 'Pear Desktop is not installed' <<<"$out")" "0"
 
 # --- finishing tells the user what to restart, rather than doing it --------
 # omarchy restart shell was tried here and pulled back: live on this

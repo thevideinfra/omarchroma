@@ -17,7 +17,6 @@ install:
 	install -Dm755 lib/hyprchroma-palette      $(LIB)/hyprchroma-palette
 	install -Dm755 lib/sync-gtk-theme          $(LIB)/sync-gtk-theme
 	install -Dm755 lib/sync-qt-kde-theme       $(LIB)/sync-qt-kde-theme
-	install -Dm644 share/pear-theme.css.template $(SHARE)/pear-theme.css.template
 	install -Dm755 share/hooks/hyprchroma      $(SHARE)/hooks/hyprchroma
 	install -Dm644 packaging/systemd/hyprchromad.service $(UNITS)/hyprchromad.service
 	install -Dm644 README.md                   $(DOC)/README.md

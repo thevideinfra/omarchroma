@@ -296,7 +296,6 @@ Panel {
     { target: "gtk", label: "GTK and GNOME", icon: "󰍛" },
     { target: "qt-kde", label: "Qt and KDE", icon: "󰖯" },
     { target: "dark-reader", label: "Dark Reader", icon: "󰈈" },
-    { target: "pear", label: "Pear Desktop", icon: "󰎆" },
     { target: "flatpak", label: "Flatpak apps", icon: "󰏗" },
     { target: "browsers", label: "Additional browsers", icon: "󰖟" }
   ]
@@ -308,7 +307,6 @@ Panel {
     gtk: true,
     qtKde: true,
     darkReader: true,
-    pear: true,
     flatpak: false,
     browsers: false
   })
@@ -332,7 +330,6 @@ Panel {
       gtk: enabledTargets.gtk !== false,
       qtKde: enabledTargets.qtKde !== false,
       darkReader: enabledTargets.darkReader !== false,
-      pear: enabledTargets.pear !== false,
       flatpak: enabledTargets.flatpak === true,
       browsers: enabledTargets.browsers === true
     }
@@ -475,15 +472,14 @@ Panel {
           gtk: frameworks.gtk !== false,
           qtKde: frameworks.qtKde !== false,
           darkReader: frameworks.darkReader !== false,
-          pear: frameworks.pear !== false,
           flatpak: frameworks.flatpak === true,
           browsers: frameworks.browsers === true
         }
       } catch (error) {
-        root.enabledTargets = { gtk: true, qtKde: true, darkReader: true, pear: true, flatpak: false, browsers: false }
+        root.enabledTargets = { gtk: true, qtKde: true, darkReader: true, flatpak: false, browsers: false }
       }
     }
-    onLoadFailed: root.enabledTargets = { gtk: true, qtKde: true, darkReader: true, pear: true, flatpak: false, browsers: false }
+    onLoadFailed: root.enabledTargets = { gtk: true, qtKde: true, darkReader: true, flatpak: false, browsers: false }
     onFileChanged: reload()
   }
 

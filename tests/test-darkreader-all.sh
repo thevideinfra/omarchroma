@@ -232,6 +232,6 @@ chk(){ [[ $2 == "$3" ]] && echo "  PASS $1" || echo "  FAIL $1: got [$2] want [$
 chk "the default browser is no longer asked for" \
   "$(grep -c 'xdg-settings\|default-web-browser\|xdg-mime' lib/hyprchroma-dark-reader bin/hyprchroma | awk -F: '{s+=$2} END {print s}')" "0"
 chk "adding Dark Reader to another browser changes the fingerprint" \
-  "$(grep -c '"$dark_reader_signature" "$pear_installed"' bin/hyprchroma)" "1"
+  "$(grep -c '"$dark_reader_signature" \\' bin/hyprchroma)" "1"
 chk "the not-installed notice needs the helper to have answered" \
   "$(grep -c 'dark_reader_known == "true" && $dark_reader_installed != "true"' bin/hyprchroma)" "1"

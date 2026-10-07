@@ -179,14 +179,6 @@ chk("...safe_read too", bounded(lambda: st.safe_read(root / "fifo", 100)), None)
 chk("...and the Dark Reader helper's reader", bounded(lambda: dr.read_capped(root / "fifo")), None)
 (root / "deep.json").write_text("[" * 200000)
 chk("the Dark Reader helper survives a nesting bomb", dr.read_capped_json(root / "deep.json"), {})
-pear = root / ".config/YouTube Music"; pear.mkdir(parents=True)
-(pear / "config.json").write_text("[]")
-try:
-    st.rewrite_pear_themes(lambda themes: themes + ["x"]); pear_result = "no crash"
-except Exception as error:
-    pear_result = type(error).__name__
-chk("a Pear config that is not an object is left alone rather than crashing",
-    (pear_result, (pear / "config.json").read_text()), ("no crash", "[]"))
 E
 
 # -- the helpers still share one writer --------------------------------------

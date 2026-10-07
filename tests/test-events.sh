@@ -66,12 +66,10 @@ chk("...while still recycling what the closed window left idle", "refresh" in ca
 (theme / "colors.toml").write_text('background = "#222222"\n')
 chk("the palette's source file changing starts a sync", (event(), ran), (True, ["--quiet"]))
 chk("...once", (event(), ran), (True, []))
-(S / "settings.json").write_text(json.dumps({"frameworks": {"pear": False}}))
+(S / "settings.json").write_text(json.dumps({"frameworks": {"flatpak": True}}))
 chk("the settings changing starts one", (event(), ran), (True, ["--quiet"]))
 dark_reader.signature = "helium:/a;firefox:/b"
 chk("Dark Reader added to another browser starts one", (event(), ran), (True, ["--quiet"]))
-(root / ".config/YouTube Music").mkdir(parents=True)
-chk("Pear Desktop appearing starts one", (event(), ran), (True, ["--quiet"]))
 (root / ".config/hyprchroma").mkdir(parents=True)
 (root / ".config/hyprchroma/palette.toml").write_text('background = "#333333"\n')
 chk("a palette file appearing starts one", (event(), ran), (True, ["--quiet"]))

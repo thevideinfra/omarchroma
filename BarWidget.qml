@@ -92,7 +92,6 @@ BarWidget {
     function toggleGtk(): void { root.toggleFramework("gtk") }
     function toggleQtKde(): void { root.toggleFramework("qt-kde") }
     function toggleDarkReader(): void { root.toggleFramework("dark-reader") }
-    function togglePear(): void { root.toggleFramework("pear") }
     function toggleFlatpak(): void { root.toggleFramework("flatpak") }
     function toggleBrowsers(): void { root.toggleFramework("browsers") }
     function refresh(): void { root.refreshEnabled() }

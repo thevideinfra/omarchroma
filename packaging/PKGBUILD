@@ -8,7 +8,7 @@
 pkgname=hyprchroma
 pkgver=3.0.0
 pkgrel=1
-pkgdesc="Carry the active Omarchy theme palette into GTK, Qt/KDE, Dark Reader and Pear Desktop"
+pkgdesc="Carry the active Omarchy theme palette into GTK, Qt/KDE, and Dark Reader"
 arch=('any')
 url="https://github.com/NobleDoodle/omarchroma"
 license=('MIT')

@@ -47,7 +47,7 @@ chk "the probe also sees a legacy whole file" \
 chk "gtk.css is cleaned before it is backed up" \
   "$(countcode '"gtk3_css": strip_hyprchroma_import' lib/hyprchroma-state)" "1"
 chk "gtk.css is no longer treated as wholly ours" \
-  "$(countcode 'WHOLLY_GENERATED = frozenset\(\{"hyprchroma_colors", "pear_css",' lib/hyprchroma-state)" "1"
+  "$(countcode 'WHOLLY_GENERATED = frozenset\(\{"hyprchroma_colors",' lib/hyprchroma-state)" "1"
 chk "the stylesheet we own is" \
   "$(countcode 'gtk3_hyprchroma_css' lib/hyprchroma-state)" "4"
 
