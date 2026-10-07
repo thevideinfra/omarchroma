@@ -85,10 +85,6 @@ Panel {
     }
   }
 
-  // The list of what to close is on the panel itself now, so it is asked for as
-  // the panel opens rather than when a view is.
-  onOpenedChanged: if (root.opened && root.ready) root.refreshStaleApps()
-
   // Asked once as the shell starts, not only when the panel opens: the bar icon
   // shows a pending update, so it has to know about one without being clicked.
   Component.onCompleted: presenceProcess.running = true
@@ -502,6 +498,8 @@ Panel {
     }
   }
 
+  // The list of what to close is on the panel itself, so it is asked for as the
+  // panel opens (presence first, which asks for it once settled).
   onOpenedChanged: if (root.opened) presenceProcess.running = true
 
   FileView {
