@@ -27,7 +27,7 @@ mkdir -p "$T/hyprchroma"
 # --- the file format is complete and self-describing ----------------------
 ./$P --template > "$T/hyprchroma/palette.toml"
 chk "the template carries every required key" \
-  "$(grep -c '^[a-z_]* = "#' "$T/hyprchroma/palette.toml")" "20"
+  "$(grep '^[a-z_]* = "#' "$T/hyprchroma/palette.toml" | grep -vc '^\(cyan\|orange\) =')" "20"
 chk "a file source wins over Omarchy" \
   "$(XDG_CONFIG_HOME=$T ./$P --source)" "$T/hyprchroma/palette.toml"
 
@@ -59,11 +59,11 @@ chk "a value that is not #rrggbb is refused" \
 if ./$P --source 2>/dev/null | grep -q omarchy; then
   ./$P --capture > "$T/hyprchroma/palette.toml"
   chk "capture writes every required key" \
-    "$(grep -c '^[a-z_]* = "#' "$T/hyprchroma/palette.toml")" "20"
+    "$(grep '^[a-z_]* = "#' "$T/hyprchroma/palette.toml" | grep -vc '^\(cyan\|orange\) =')" "20"
   chk "capture includes a key Omarchy derives rather than stores" \
     "$(XDG_CONFIG_HOME=$T ./$P selection_foreground | grep -c '^#')" "1"
   chk "what capture wrote reads back without Omarchy" \
-    "$(XDG_CONFIG_HOME=$T ./$P --all | wc -l)" "21"
+    "$(XDG_CONFIG_HOME=$T ./$P --all | grep -vc '^\(cyan\|orange\)	')" "21"
   # The sync's single run: the whole palette and what identifies it.
   chk "--for-sync is --all, line for line, and the source id after it" \
     "$(diff <(./$P --all) <(./$P --for-sync | grep -v '^source_id') && ./$P --for-sync | sed -n 's/^source_id\t//p')" \

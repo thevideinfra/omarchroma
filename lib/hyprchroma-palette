@@ -9,6 +9,7 @@ detection exactly as Omarchy computes them, instead of approximating them
 here and drifting.
 """
 import hashlib
+import json
 import os
 import re
 import stat
@@ -92,6 +93,53 @@ REQUIRED = (
 HEX = re.compile(r"\A#[0-9A-Fa-f]{6}\Z")
 MAX_PALETTE = 256 * 1024
 
+# The colors the accent can be set to instead of the theme's own. Five of them
+# are already in REQUIRED; these two are optional keys, kept when a palette
+# defines them so a captured palette carries every choice.
+ACCENT_CHOICES = ("blue", "cyan", "green", "magenta", "yellow", "red", "orange")
+OPTIONAL_ACCENTS = ("cyan", "orange")
+MAX_SETTINGS = 64 * 1024
+
+
+def accent_setting() -> str:
+    """The accent the user chose, or "theme".
+
+    settings.json is a file any process of this account can write, so what it
+    says is only ever compared with the fixed names above -- the color itself
+    always comes from the resolved palette. Opened without following a link or
+    blocking on a fifo, and read to a cap."""
+    base = os.environ.get("XDG_STATE_HOME") or (str(Path.home()) + "/.local/state")
+    path = Path(base) / "hyprchroma" / "settings.json"
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+    except OSError:
+        return "theme"
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            return "theme"
+        data = os.read(descriptor, MAX_SETTINGS + 1)
+    except OSError:
+        return "theme"
+    finally:
+        os.close(descriptor)
+    if len(data) > MAX_SETTINGS:
+        return "theme"
+    try:
+        value = json.loads(data).get("accent")
+    except (ValueError, RecursionError, AttributeError):
+        return "theme"
+    return value if isinstance(value, str) and value in ACCENT_CHOICES else "theme"
+
+
+def with_accent(resolved: dict) -> dict:
+    """Swap in the chosen accent. A choice the palette does not define leaves
+    the theme's own, so a theme change never leaves this without an accent."""
+    choice = accent_setting()
+    color = resolved.get(choice) if choice != "theme" else None
+    if color and HEX.match(color):
+        resolved["accent"] = color
+    return resolved
+
 
 def palette_file() -> Path:
     base = os.environ.get("XDG_CONFIG_HOME") or (str(Path.home()) + "/.config")
@@ -142,7 +190,7 @@ def derive_mode(values: dict) -> str:
     return "light" if red + green + blue > 382 else "dark"
 
 
-def from_file(path: Path) -> dict:
+def from_file(path: Path, apply_accent: bool = True) -> dict:
     values = read_palette(path)
     missing = [key for key in REQUIRED if key not in values]
     if missing:
@@ -154,14 +202,17 @@ def from_file(path: Path) -> dict:
         raise SystemExit(
             f"hyprchroma-palette: {path} has values that are not #rrggbb: {', '.join(bad)}")
     resolved = {key: values[key] for key in REQUIRED}
+    for key in OPTIONAL_ACCENTS:
+        if HEX.match(values.get(key, "")):
+            resolved[key] = values[key]
     mode = values.get("mode") or values.get("theme_type") or derive_mode(values)
     resolved["mode"] = "light" if str(mode).lower() == "light" else "dark"
     if values.get("font"):
         resolved["font"] = values["font"]
-    return resolved
+    return with_accent(resolved) if apply_accent else resolved
 
 
-def from_omarchy() -> dict:
+def from_omarchy(apply_accent: bool = True) -> dict:
     """One invocation, not one per key.
 
     omarchy theme color --all resolves the whole palette in a single pass. Asking
@@ -181,8 +232,11 @@ def from_omarchy() -> dict:
         raise SystemExit(
             f"hyprchroma-palette: omarchy has no usable {', '.join(missing)}")
     resolved = {key: values[key] for key in REQUIRED}
+    for key in OPTIONAL_ACCENTS:
+        if HEX.match(values.get(key, "")):
+            resolved[key] = values[key]
     resolved["mode"] = "light" if values.get("mode", "").lower() == "light" else "dark"
-    return resolved
+    return with_accent(resolved) if apply_accent else resolved
 
 
 def source() -> tuple:
@@ -225,6 +279,9 @@ def template() -> str:
              ""]
     for key in REQUIRED:
         lines.append(f'{key} = "#000000"')
+    lines += ["",
+              "# Optional: more colors the accent picker can choose from.",
+              *[f'# {key} = "#000000"' for key in OPTIONAL_ACCENTS]]
     return "\n".join(lines) + "\n"
 
 
@@ -238,12 +295,13 @@ def main() -> int:
         # Omarchy that means Omarchy's own cascade did the resolving, so the
         # result is what Omarchy would have produced rather than an
         # approximation of it made here.
-        resolved = from_omarchy() if have_omarchy() else resolve()
+        resolved = from_omarchy(False) if have_omarchy() else from_file(source()[1], False)
         out = ["# Captured by 'hyprchroma palette --capture'.",
                f"# Source: {'omarchy' if have_omarchy() else source()[1]}", ""]
         mode = resolved.pop("mode", "dark")
         out.append(f'mode = "{mode}"')
-        out += [f'{key} = "{resolved[key]}"' for key in REQUIRED]
+        out += [f'{key} = "{resolved[key]}"'
+                for key in REQUIRED + tuple(k for k in OPTIONAL_ACCENTS if k in resolved)]
         sys.stdout.write("\n".join(out) + "\n")
         return 0
     if argument == "--source":
