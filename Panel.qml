@@ -509,6 +509,141 @@ Panel {
     onFileChanged: reload()
   }
 
+  // The look follows Tandem and omaudiopanel: a hero header with the version
+  // and a repository link, dim-icon section titles in letter-spaced capitals,
+  // outlined cards, and one highlight color -- the theme's accent -- for
+  // switches, hover and the version pill.
+  readonly property color fg: root.bar ? root.bar.foreground : Color.popups.text
+  readonly property string fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+  readonly property color accent: Color.accent
+  readonly property string repoUrl: "https://github.com/thevideinfra/omarchroma"
+  readonly property int enabledCount: root.visibleFrameworks.filter(function(entry) {
+    return root.targetEnabled(entry.target)
+  }).length
+
+  // Section title: a dim icon, then the bold title.
+  component SectionLabel: Row {
+    id: section
+    property string icon: ""
+    property string text: ""
+    spacing: Style.space(7)
+
+    Text {
+      anchors.verticalCenter: parent.verticalCenter
+      textFormat: Text.PlainText
+      text: section.icon
+      color: root.fg
+      opacity: 0.65
+      font.family: root.fontFamily
+      font.pixelSize: Math.round(Style.font.caption * 1.2)
+    }
+
+    Text {
+      anchors.verticalCenter: parent.verticalCenter
+      textFormat: Text.PlainText
+      text: section.text
+      color: Qt.darker(root.fg, 1.4)
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+      font.letterSpacing: 1.2
+    }
+  }
+
+  // Compact on/off switch tinted in the accent. Display only: the row it sits
+  // in takes the click.
+  component AccentSwitch: Item {
+    id: sw
+    property bool checked: false
+    property bool busy: false
+
+    implicitWidth: Style.space(34)
+    implicitHeight: Style.space(18)
+    opacity: sw.busy ? 0.5 : 1.0
+
+    Rectangle {
+      anchors.fill: parent
+      radius: height / 2
+      color: sw.checked ? Util.alpha(root.accent, 0.3) : Util.alpha(root.fg, 0.1)
+      border.width: 1
+      border.color: sw.checked ? root.accent : Util.alpha(root.fg, 0.25)
+      Behavior on color { ColorAnimation { duration: 120 } }
+
+      Rectangle {
+        width: parent.height - Style.space(6)
+        height: width
+        radius: width / 2
+        anchors.verticalCenter: parent.verticalCenter
+        x: sw.checked ? parent.width - width - (parent.height - height) / 2 : (parent.height - height) / 2
+        color: sw.checked ? root.accent : Qt.darker(root.fg, 1.4)
+        Behavior on x { NumberAnimation { duration: 120 } }
+        Behavior on color { ColorAnimation { duration: 120 } }
+      }
+    }
+  }
+
+  // Outlined button: icon, label, and the accent on hover. `alert` lights it
+  // in the theme's alert color, for a service that is behind this panel.
+  component ActionCard: Rectangle {
+    id: card
+    property string iconText: ""
+    property string text: ""
+    property bool alert: false
+    readonly property color alertColor: root.bar ? root.bar.urgent : Color.urgent
+    signal clicked()
+
+    implicitHeight: cardRow.implicitHeight + Style.space(14)
+    radius: Style.space(7)
+    opacity: card.enabled ? 1.0 : 0.5
+    color: card.alert
+      ? Util.alpha(card.alertColor, 0.30)
+      : Util.alpha(root.fg, cardMouse.containsMouse ? 0.09 : 0.05)
+    border.width: card.alert || (cardMouse.containsMouse && card.enabled) ? 2 : 1
+    border.color: card.alert ? card.alertColor
+      : (cardMouse.containsMouse && card.enabled ? root.accent : Util.alpha(root.fg, 0.12))
+
+    Row {
+      id: cardRow
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      anchors.leftMargin: Style.space(10)
+      anchors.right: parent.right
+      anchors.rightMargin: Style.space(10)
+      spacing: Style.space(8)
+
+      Text {
+        visible: card.iconText !== ""
+        anchors.verticalCenter: parent.verticalCenter
+        textFormat: Text.PlainText
+        text: card.iconText
+        color: cardMouse.containsMouse && card.enabled ? root.accent : root.fg
+        opacity: 0.85
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+      }
+
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        width: parent.width - (card.iconText !== "" ? Style.space(26) : 0)
+        textFormat: Text.PlainText
+        text: card.text
+        color: root.fg
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+        elide: Text.ElideRight
+      }
+    }
+
+    MouseArea {
+      id: cardMouse
+      anchors.fill: parent
+      hoverEnabled: true
+      enabled: card.enabled
+      cursorShape: Qt.PointingHandCursor
+      onClicked: card.clicked()
+    }
+  }
+
   KeyboardPanel {
     id: panel
     anchorItem: root.anchorItem
@@ -516,7 +651,7 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(300))
+    contentWidth: panel.fittedContentWidth(Style.space(320))
     contentHeight: panel.fittedContentHeight(content.implicitHeight)
 
     PanelKeyCatcher {
@@ -534,25 +669,138 @@ Panel {
       Column {
         id: content
         width: parent.width
-        spacing: Style.space(8)
+        spacing: Style.space(10)
 
-        Text {
-          text: root.guideOpen
-            ? (root.staleWindowCount > 0 ? root.windowsPhrase(root.staleWindowCount) + " to close"
-                                        : "Applications to close")
-              + (root.hiddenFrameworks.length > 0 ? ", and what you removed" : "")
-            : "Omarchroma"
-          color: root.bar ? root.bar.foreground : Color.popups.text
-          font.family: root.bar ? root.bar.fontFamily : Style.font.family
-          font.pixelSize: Style.font.body
-          font.bold: true
+        // ---------- Hero: icon, name and status, version, repository ----------
+        Item {
+          width: parent.width
+          implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight)
+
+          Text {
+            id: heroIcon
+            textFormat: Text.PlainText
+            text: "󰏘"
+            color: root.accent
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.display
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+          }
+
+          Column {
+            id: heroLabels
+            anchors.left: heroIcon.right
+            anchors.leftMargin: Style.space(12)
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(2)
+
+            Item {
+              width: parent.width
+              implicitHeight: Math.max(titleText.implicitHeight, infoRow.implicitHeight)
+
+              Text {
+                id: titleText
+                anchors.left: parent.left
+                anchors.right: infoRow.left
+                anchors.rightMargin: Style.space(8)
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: "omarchroma"
+                color: root.fg
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.title
+                font.bold: true
+                elide: Text.ElideRight
+              }
+
+              Row {
+                id: infoRow
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Style.space(8)
+
+                Rectangle {
+                  visible: root.expectedVersion !== ""
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: versionText.implicitWidth + Style.space(10)
+                  height: versionText.implicitHeight + Style.space(4)
+                  radius: height / 2
+                  color: Util.alpha(root.accent, 0.15)
+                  border.width: 1
+                  border.color: Util.alpha(root.accent, 0.45)
+
+                  Text {
+                    id: versionText
+                    anchors.centerIn: parent
+                    textFormat: Text.PlainText
+                    text: "v" + root.expectedVersion
+                    color: root.accent
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    font.bold: true
+                  }
+                }
+
+                // Opens the repository in the browser.
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  textFormat: Text.PlainText
+                  text: ""
+                  color: repoMouse.containsMouse ? root.accent : root.fg
+                  opacity: repoMouse.containsMouse ? 1.0 : 0.6
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.body
+
+                  MouseArea {
+                    id: repoMouse
+                    anchors.fill: parent
+                    anchors.margins: -Style.space(4)
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: Quickshell.execDetached(["xdg-open", root.repoUrl])
+                  }
+                }
+              }
+            }
+
+            Text {
+              width: parent.width
+              textFormat: Text.PlainText
+              text: refreshProcess.running
+                ? (root.targetEnabled(root.activeTarget) ? "SYNCHRONIZING " : "REVERTING ")
+                  + String(root.activeTarget).toUpperCase() + "…"
+                : (root.ready
+                    ? root.enabledCount + " OF " + root.visibleFrameworks.length + " ACTIVE"
+                    : (!root.dependencyChecked ? ""
+                        : (!root.dependencyPresent ? "SERVICE NOT INSTALLED"
+                            : (root.outdated ? "UPDATE AVAILABLE" : "SERVICE NOT RUNNING"))))
+              color: Color.muted
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              font.letterSpacing: 0.8
+              elide: Text.ElideRight
+            }
+          }
         }
 
+        PanelSeparator {
+          foreground: root.fg
+        }
+
+        // ---------- Applications to close, and what was removed ----------
         Column {
           id: guide
           visible: root.guideOpen
           width: content.width
-          spacing: Style.space(6)
+          spacing: Style.space(8)
+
+          SectionLabel {
+            icon: "󰖯"
+            text: (root.staleWindowCount > 0 ? root.windowsPhrase(root.staleWindowCount) + " to close"
+                                             : "Applications to close").toUpperCase()
+              + (root.hiddenFrameworks.length > 0 ? " · REMOVED" : "")
+          }
 
           // The heading already says what the list is, so nothing is said twice.
           // Only the empty case needs a word, because an empty list says nothing.
@@ -561,7 +809,7 @@ Panel {
             width: guide.width
             text: "Nothing to close."
             color: Color.muted
-            font.family: root.bar ? root.bar.fontFamily : Style.font.family
+            font.family: root.fontFamily
             font.pixelSize: Style.font.caption
           }
 
@@ -574,56 +822,79 @@ Panel {
             width: guide.width
             text: "Removed — press the number to put one back"
             color: Color.muted
-            font.family: root.bar ? root.bar.fontFamily : Style.font.family
+            font.family: root.fontFamily
             font.pixelSize: Style.font.caption
-            topPadding: Style.space(6)
           }
 
           Repeater {
             model: root.hiddenFrameworks
-            delegate: Item {
+            delegate: Rectangle {
               id: gone
               required property var modelData
               required property int index
               width: guide.width
-              height: Math.max(Style.spacing.controlHeight, goneLabel.implicitHeight)
+              height: Math.max(Style.spacing.controlHeight, goneRow.implicitHeight + Style.space(8))
+              radius: Style.space(7)
+              color: Util.alpha(root.fg, goneMouse.containsMouse ? 0.09 : 0.05)
+              border.width: goneMouse.containsMouse ? 2 : 1
+              border.color: goneMouse.containsMouse ? root.accent : Util.alpha(root.fg, 0.12)
 
-              Text {
-                id: goneIcon
-                text: gone.modelData.icon
-                color: Color.muted
-                font.family: root.bar ? root.bar.fontFamily : Style.font.family
-                font.pixelSize: Style.font.body
+              Row {
+                id: goneRow
+                anchors.verticalCenter: parent.verticalCenter
                 anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-              }
-
-              Text {
-                id: goneLabel
-                text: gone.modelData.label
-                color: root.bar ? root.bar.foreground : Color.popups.text
-                font.family: root.bar ? root.bar.fontFamily : Style.font.family
-                font.pixelSize: Style.font.body
-                anchors.left: goneIcon.right
                 anchors.leftMargin: Style.space(10)
-                anchors.right: goneKey.left
-                anchors.rightMargin: Style.space(10)
-                anchors.verticalCenter: parent.verticalCenter
-                elide: Text.ElideRight
-              }
-
-              Text {
-                id: goneKey
-                text: String(gone.index + 1)
-                color: Color.muted
-                font.family: root.bar ? root.bar.fontFamily : Style.font.family
-                font.pixelSize: Style.font.caption
                 anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
+                anchors.rightMargin: Style.space(10)
+                spacing: Style.space(10)
+
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  textFormat: Text.PlainText
+                  text: gone.modelData.icon
+                  color: root.fg
+                  opacity: 0.65
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.body
+                }
+
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: parent.width - Style.space(20) - goneKey.width - Style.font.body
+                  textFormat: Text.PlainText
+                  text: gone.modelData.label
+                  color: root.fg
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.body
+                  elide: Text.ElideRight
+                }
+
+                Rectangle {
+                  id: goneKey
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: Math.max(height, goneKeyText.implicitWidth + Style.space(8))
+                  height: goneKeyText.implicitHeight + Style.space(4)
+                  radius: Style.space(4)
+                  color: "transparent"
+                  border.width: 1
+                  border.color: Util.alpha(root.fg, 0.25)
+
+                  Text {
+                    id: goneKeyText
+                    anchors.centerIn: parent
+                    textFormat: Text.PlainText
+                    text: String(gone.index + 1)
+                    color: Color.muted
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+                }
               }
 
               MouseArea {
+                id: goneMouse
                 anchors.fill: parent
+                hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: root.restoreFramework(gone.modelData.target)
               }
@@ -643,10 +914,10 @@ Panel {
 
               Text {
                 id: staleName
-                text: "\u2022  " + staleRow.modelData
+                text: "•  " + staleRow.modelData
                 textFormat: Text.PlainText
-                color: root.bar ? root.bar.foreground : Color.popups.text
-                font.family: root.bar ? root.bar.fontFamily : Style.font.family
+                color: root.fg
+                font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
                 anchors.left: parent.left
                 anchors.right: staleRowWindows.left
@@ -659,9 +930,9 @@ Panel {
                 text: root.windowsPhrase(root.windowsOf(staleRow.modelData))
                 // The name's color, dimmed: Color.muted all but vanishes on some
                 // themes' panels, and this is a count to read, not a hint.
-                color: root.bar ? root.bar.foreground : Color.popups.text
+                color: root.fg
                 opacity: 0.7
-                font.family: root.bar ? root.bar.fontFamily : Style.font.family
+                font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
                 anchors.right: parent.right
               }
@@ -673,31 +944,16 @@ Panel {
             width: guide.width
             text: "and " + (root.staleApps.length - root.staleShown) + " more"
             color: Color.muted
-            font.family: root.bar ? root.bar.fontFamily : Style.font.family
+            font.family: root.fontFamily
             font.pixelSize: Style.font.caption
           }
 
-          Button {
+          ActionCard {
             width: guide.width
             text: "Back  (/)"
-            iconText: "\udb80\udf0d"
-            foreground: root.bar ? root.bar.foreground : Color.popups.text
+            iconText: "󰌍"
             onClicked: root.guideOpen = false
           }
-        }
-
-        Text {
-          visible: !root.guideOpen && root.ready
-          text: refreshProcess.running
-            ? (root.targetEnabled(root.activeTarget)
-                ? "Synchronizing " + root.activeTarget + "..."
-                : "Reverting " + root.activeTarget + "...")
-            : "Switching one off restores how it looked before Omarchroma."
-          color: Color.muted
-          font.family: root.bar ? root.bar.fontFamily : Style.font.family
-          font.pixelSize: Style.font.caption
-          wrapMode: Text.WordWrap
-          width: parent.width
         }
 
         // Until hyprchroma exists there is exactly one thing to do from this
@@ -708,7 +964,10 @@ Panel {
         // framework toggles, the separator, refresh, the close-apps count --
         // is real only once the service is; each is gated on root.ready for
         // the same reason this replaces the old descriptive sentence.
-        Button {
+        //
+        // Lit in the theme's alert color while the service is behind this
+        // panel -- the color the bar icon takes, since this is what clears it.
+        ActionCard {
           visible: !root.guideOpen && root.dependencyChecked && !root.ready
           width: content.width
           enabled: !root.installing
@@ -717,85 +976,115 @@ Panel {
             : (!root.dependencyPresent
                 ? "Install  (i)"
                 : root.outdated ? "Update  (i)" : "Start  (i)")
-          // Lit in the theme's alert color while the service is behind this
-          // panel -- the color the bar icon takes, since this is what clears
-          // it: a fill and a solid border of it, under the panel's own text,
-          // which stays readable where a theme's alert color is a muted one.
-          // Drawn here rather than through the kit's "selected" state, which a
-          // theme may fix to a color of its own.
-          readonly property color alertColor: root.bar ? root.bar.urgent : Color.urgent
-          foreground: root.bar ? root.bar.foreground : Color.popups.text
-          background: root.outdated ? Util.alpha(alertColor, 0.30) : "transparent"
-
-          Rectangle {
-            anchors.fill: parent
-            visible: root.outdated
-            color: "transparent"
-            radius: parent.radius
-            border.width: 1
-            border.color: parent.alertColor
-          }
+          alert: root.outdated
           onClicked: root.installDependency()
+        }
+
+        // ---------- Frameworks ----------
+        SectionLabel {
+          visible: !root.guideOpen && root.ready
+          icon: "󰏘"
+          text: "FRAMEWORKS"
         }
 
         Repeater {
           model: root.visibleFrameworks
 
-          delegate: Item {
+          delegate: Rectangle {
             id: row
             visible: !root.guideOpen && root.ready
             required property var modelData
             required property int index
             width: content.width
-            height: Math.max(Style.spacing.controlHeight, label.implicitHeight)
+            height: visible ? Math.max(Style.spacing.controlHeight, rowInner.implicitHeight + Style.space(8)) : 0
+            radius: Style.space(7)
+            color: Util.alpha(root.fg, rowMouse.containsMouse ? 0.09 : 0.05)
+            border.width: 1
+            border.color: root.targetEnabled(row.modelData.target)
+              ? Util.alpha(root.accent, rowMouse.containsMouse ? 0.7 : 0.35)
+              : Util.alpha(root.fg, 0.12)
 
-            Text {
-              id: icon
-              text: row.modelData.icon
-              color: root.bar ? root.bar.foreground : Color.popups.text
-              font.family: root.bar ? root.bar.fontFamily : Style.font.family
-              font.pixelSize: Style.font.body
+            Row {
+              id: rowInner
+              anchors.verticalCenter: parent.verticalCenter
               anchors.left: parent.left
-              anchors.verticalCenter: parent.verticalCenter
-            }
-
-            Text {
-              id: label
-              text: row.modelData.label
-              color: root.bar ? root.bar.foreground : Color.popups.text
-              font.family: root.bar ? root.bar.fontFamily : Style.font.family
-              font.pixelSize: Style.font.body
-              anchors.left: icon.right
               anchors.leftMargin: Style.space(10)
-              anchors.right: keyHint.left
-              anchors.rightMargin: Style.space(10)
-              anchors.verticalCenter: parent.verticalCenter
-              elide: Text.ElideRight
-            }
-
-            // The key that toggles this row, shown so the shortcut is
-            // discoverable without reading the README.
-            Text {
-              id: keyHint
-              text: String(row.index + 1)
-              color: Color.muted
-              font.family: root.bar ? root.bar.fontFamily : Style.font.family
-              font.pixelSize: Style.font.caption
-              anchors.right: toggle.left
-              anchors.rightMargin: Style.space(10)
-              anchors.verticalCenter: parent.verticalCenter
-            }
-
-            ToggleSwitch {
-              id: toggle
-              checked: root.targetEnabled(row.modelData.target)
-              busy: refreshProcess.running
-              foreground: root.bar ? root.bar.foreground : Color.popups.text
               anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              onToggled: root.setTargetEnabled(row.modelData.target, !checked)
+              anchors.rightMargin: Style.space(10)
+              spacing: Style.space(10)
+
+              Text {
+                id: icon
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: row.modelData.icon
+                color: root.targetEnabled(row.modelData.target) ? root.accent : root.fg
+                opacity: root.targetEnabled(row.modelData.target) ? 1.0 : 0.65
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+              }
+
+              Text {
+                id: label
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width - toggle.width - keyHint.width - Style.font.body - 3 * parent.spacing
+                textFormat: Text.PlainText
+                text: row.modelData.label
+                color: root.fg
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                elide: Text.ElideRight
+              }
+
+              // The key that toggles this row, shown so the shortcut is
+              // discoverable without reading the README.
+              Rectangle {
+                id: keyHint
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.max(height, keyHintText.implicitWidth + Style.space(8))
+                height: keyHintText.implicitHeight + Style.space(4)
+                radius: Style.space(4)
+                color: "transparent"
+                border.width: 1
+                border.color: Util.alpha(root.fg, 0.25)
+
+                Text {
+                  id: keyHintText
+                  anchors.centerIn: parent
+                  textFormat: Text.PlainText
+                  text: String(row.index + 1)
+                  color: Color.muted
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                }
+              }
+
+              AccentSwitch {
+                id: toggle
+                anchors.verticalCenter: parent.verticalCenter
+                checked: root.targetEnabled(row.modelData.target)
+                busy: refreshProcess.running
+              }
+            }
+
+            MouseArea {
+              id: rowMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.setTargetEnabled(row.modelData.target, !root.targetEnabled(row.modelData.target))
             }
           }
+        }
+
+        Text {
+          visible: !root.guideOpen && root.ready
+          text: "Switching one off restores how it looked before Omarchroma."
+          color: Color.muted
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          wrapMode: Text.WordWrap
+          width: parent.width
         }
 
         // Gated on root.ready, not just !guideOpen: these act on a running
@@ -804,30 +1093,27 @@ Panel {
         // controls for a thing that does not exist yet.
         PanelSeparator {
           visible: !root.guideOpen && root.ready
-          foreground: root.bar ? root.bar.foreground : Color.popups.text
+          foreground: root.fg
         }
 
-
-        Button {
+        ActionCard {
           visible: !root.guideOpen && root.ready
           width: content.width
           text: "Refresh enabled  (r)"
           iconText: "󰑐"
-          foreground: root.bar ? root.bar.foreground : Color.popups.text
           enabled: !refreshProcess.running
           onClicked: root.refresh("all")
         }
 
         // Reachable by mouse as well as by "/", and carries the count so the
         // number of windows waiting is visible without opening it.
-        Button {
+        ActionCard {
           visible: !root.guideOpen && root.ready
           width: content.width
           text: root.staleWindowCount > 0
             ? root.windowsPhrase(root.staleWindowCount) + " to close  (/)"
             : "Nothing to close  (/)"
           iconText: "󰖯"
-          foreground: root.bar ? root.bar.foreground : Color.popups.text
           onClicked: {
             root.refreshStaleApps()
             root.guideOpen = true

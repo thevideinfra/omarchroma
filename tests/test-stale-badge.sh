@@ -124,7 +124,7 @@ chk "...totals them for the button and the heading" \
 chk "...and puts each app's count beside it, in words so it is not taken for a key" \
   "$(grep -c 'text: root.windowsPhrase(root.windowsOf(staleRow.modelData))' Panel.qml)" "1"
 chk "...readable on every theme: the name's color dimmed, not Color.muted, which all but vanished" \
-  "$(awk '/id: staleRowWindows/,/^              }/' Panel.qml | sed 's|//.*||' | grep -cE 'color: root.bar \? root.bar.foreground|opacity: 0.7|Color.muted')" "2"
+  "$(awk '/id: staleRowWindows/,/^              }/' Panel.qml | sed 's|//.*||' | grep -cE 'color: root.fg|opacity: 0.7|Color.muted')" "2"
 chk "...with a count raised beside it in that same color" \
   "$(awk '/id: staleBadge/,/^  }/' BarWidget.qml | grep -cE 'color: button.activeColor|visible: root.alertCount > 0')" "2"
 chk "...drawn as the shell draws the glyph, so it is not color-fringed" \
@@ -215,6 +215,6 @@ chk "...again when the plugin's manifest changes" \
 chk "...and when pacman replaces the service's binary" \
   "$(awk '/id: serviceBinary/,/^  }/' Panel.qml | grep -cE 'path: "/usr/bin/hyprchroma"|watchChanges: true|presenceProcess.running = true')" "3"
 chk "the Update button is lit in the urgent color while an update is pending: a fill and a border of it" \
-  "$(grep -c 'background: root.outdated ? Util.alpha(alertColor, 0.30) : "transparent"' Panel.qml),$(grep -cE 'border.color: parent.alertColor' Panel.qml)" "1,1"
+  "$(grep -c 'alert: root.outdated' Panel.qml),$(grep -c 'Util.alpha(card.alertColor, 0.30)' Panel.qml),$(grep -c 'border.color: card.alert ? card.alertColor' Panel.qml)" "1,1,1"
 chk "...drawn by the panel, not the kit's selected state, which a theme may fix to its own color" \
   "$(grep -cE '^\s+selected: root.outdated' Panel.qml)" "0"
