@@ -133,3 +133,24 @@ chk "the daemon already watches settings.json for changes" \
   "$(grep -c 'theme.name", state_dir / "settings.json")' lib/hyprchroma-state)" "1"
 chk "a held lock is waited for, not skipped, for an accent change" \
   "$(grep -c 'force == 0 && -z \$set_enabled && -z \$set_accent' bin/hyprchroma)" "1"
+
+echo "--- the panel ---"
+names_py=$(grep -o '^ACCENT_CHOICES = (.*)' lib/hyprchroma-palette | grep -o '"[a-z]*"' | tr -d '"' | paste -sd, -)
+names_qml=$(grep -o 'readonly property var names: \[.*\]' ThemePalette.qml | grep -o '"[a-z]*"' | tr -d '"' | paste -sd, -)
+chk "the picker offers exactly the colors the service accepts" "$names_qml" "$names_py"
+chk "the picker lists the theme first, then what the theme defines" \
+  "$(grep -c 'var list = \["theme"\]' ThemePalette.qml)" "1"
+chk "the theme's colors are read from its colors.toml and re-read when it changes" \
+  "$(grep -cE '/colors.toml"|watchChanges: true' ThemePalette.qml)" "2"
+chk "the panel reads the saved choice from settings.json" \
+  "$(grep -c 'parsed.accent' Panel.qml)" "1"
+chk "...and accepts only a name the picker knows" \
+  "$(grep -c 'themePalette.names.indexOf(picked)' Panel.qml)" "1"
+chk "picking runs the service's flag" \
+  "$(grep -c '"--set-accent=" + name' Panel.qml)" "1"
+chk "the swatches come from the theme's palette" \
+  "$(grep -c 'model: themePalette.available' Panel.qml)" "1"
+chk "the panel's own accent is untouched by the choice" \
+  "$(grep -c 'readonly property color accent: Color.accent' Panel.qml)" "1"
+chk "the picker says what it applies to" \
+  "$(grep -c 'Applies to synchronized apps, not this panel' Panel.qml)" "1"

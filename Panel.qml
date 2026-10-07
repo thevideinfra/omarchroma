@@ -306,6 +306,11 @@ Panel {
   // The gear's view: density and font size, in place of everything below the
   // header. Mutually exclusive with the guide, so there is one thing on screen.
   property bool settingsOpen: false
+  // The accent synchronized apps use: "theme" or a palette color's name. Held
+  // here only to show which swatch is chosen; the service owns the setting.
+  property string accentChoice: "theme"
+
+  ThemePalette { id: themePalette }
   readonly property bool mainView: !root.guideOpen && !root.settingsOpen
 
   // However many are open, the panel stays a readable size and says how many
@@ -511,6 +516,8 @@ Panel {
       try {
         var parsed = JSON.parse(text())
         var frameworks = parsed.frameworks || {}
+        var picked = parsed.accent
+        root.accentChoice = themePalette.names.indexOf(picked) >= 0 ? picked : "theme"
         // Frameworks the user said they did not want. Off is a toggle; removed
         // takes the row out of the panel entirely.
         root.removedTargets = Array.isArray(parsed.removed) ? parsed.removed : []
@@ -522,10 +529,14 @@ Panel {
           browsers: frameworks.browsers === true
         }
       } catch (error) {
+        root.accentChoice = "theme"
         root.enabledTargets = { gtk: true, qtKde: true, darkReader: true, flatpak: false, browsers: false }
       }
     }
-    onLoadFailed: root.enabledTargets = { gtk: true, qtKde: true, darkReader: true, flatpak: false, browsers: false }
+    onLoadFailed: {
+      root.accentChoice = "theme"
+      root.enabledTargets = { gtk: true, qtKde: true, darkReader: true, flatpak: false, browsers: false }
+    }
     onFileChanged: reload()
   }
 
@@ -572,6 +583,18 @@ Panel {
   readonly property real fontCaption: Math.max(9, Math.round(Style.font.caption * fontScale))
 
   function sp(px) { return Style.space(px * densityScale) }
+
+  function setAccent(name) {
+    if (refreshProcess.running) return
+    root.accentChoice = name
+    root.activeTarget = "accent"
+    refreshProcess.command = [
+      "/usr/bin/hyprchroma",
+      "--set-accent=" + name,
+      "--notify"
+    ]
+    refreshProcess.running = true
+  }
 
   function setSetting(key, value) {
     Quickshell.execDetached(["omarchy", "bar", "set", root.moduleName, key, JSON.stringify(value), "--json"])
@@ -652,6 +675,74 @@ Panel {
 
   // Equal-width choice boxes; the chosen one is tinted and outlined in the
   // accent.
+  // The theme's own accent, then the other colors of its palette, each drawn in
+  // its real color. The chosen one is ringed.
+  component AccentPicker: Flow {
+    id: picker
+    spacing: root.sp(5)
+
+    Repeater {
+      model: themePalette.available
+
+      Rectangle {
+        id: swatch
+        required property string modelData
+        readonly property bool isTheme: modelData === "theme"
+        // A saved color the theme no longer defines shows as the theme's own.
+        readonly property bool chosen: isTheme
+          ? themePalette.available.indexOf(root.accentChoice) < 0 || root.accentChoice === "theme"
+          : root.accentChoice === modelData
+        width: isTheme ? themeLabel.implicitWidth + root.sp(30) : root.sp(23)
+        height: root.sp(23)
+        radius: height / 2
+        color: isTheme ? Util.alpha(root.fg, 0.06) : themePalette.colors[modelData]
+        border.width: chosen ? 2 : 1
+        border.color: chosen ? root.fg : Util.alpha(root.fg, isTheme ? 0.25 : 0.15)
+
+        // The theme entry is a pill with a dot in the theme's own accent.
+        Rectangle {
+          visible: swatch.isTheme
+          anchors.left: parent.left
+          anchors.leftMargin: root.sp(7)
+          anchors.verticalCenter: parent.verticalCenter
+          width: root.sp(11)
+          height: width
+          radius: width / 2
+          color: themePalette.colors.accent !== undefined ? themePalette.colors.accent : Color.accent
+        }
+
+        Text {
+          id: themeLabel
+          visible: swatch.isTheme
+          anchors.right: parent.right
+          anchors.rightMargin: root.sp(8)
+          anchors.verticalCenter: parent.verticalCenter
+          textFormat: Text.PlainText
+          text: "Theme"
+          color: root.fg
+          font.family: root.fontFamily
+          font.pixelSize: root.fontCaption
+          font.bold: swatch.chosen
+        }
+
+        MouseArea {
+          id: swatchMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: root.setAccent(swatch.modelData)
+        }
+
+        PanelToolTip {
+          visible: swatchMouse.containsMouse
+          text: swatch.isTheme ? "Follow the theme's accent"
+            : swatch.modelData.charAt(0).toUpperCase() + swatch.modelData.slice(1)
+          fontFamily: root.fontFamily
+        }
+      }
+    }
+  }
+
   component Segmented: Grid {
     id: segmented
     property var choices: []
@@ -947,6 +1038,22 @@ Panel {
             text: "Back"
             iconText: "󰌍"
             onClicked: root.settingsOpen = false
+          }
+
+          SectionLabel {
+            icon: ""
+            text: "ACCENT"
+          }
+
+          AccentPicker { width: settingsView.width }
+
+          Text {
+            width: settingsView.width
+            text: "Applies to synchronized apps, not this panel."
+            color: Color.muted
+            font.family: root.fontFamily
+            font.pixelSize: root.fontCaption
+            wrapMode: Text.WordWrap
           }
 
           SectionLabel {
