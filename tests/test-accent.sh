@@ -74,3 +74,62 @@ if command -v omarchy >/dev/null; then
   chk "palette --capture ignores the chosen accent" \
     "$([[ $with == "$without" ]] && echo same || echo differs)" "same"
 fi
+
+echo "--- the command ---"
+# The sync script's layout is derived from the binary's own location, so the
+# fake tree is a real one with a stub state helper that logs and writes.
+CLI=$(mktemp -d)
+trap 'rm -rf "$ROOT" "$CLI"' EXIT
+(
+  export HOME=$CLI XDG_STATE_HOME=$CLI/state XDG_DATA_HOME=$CLI/data XDG_RUNTIME_DIR=$CLI/run
+  unset XDG_CONFIG_HOME
+  source "$REPO/tests/lib-omarchy.sh"
+  seed_omarchy_theme
+  mkdir -p "$XDG_RUNTIME_DIR" "$CLI/lib" "$CLI/bin" "$XDG_STATE_HOME/hyprchroma"
+  cp "$REPO"/lib/hyprchroma-* "$REPO"/lib/sync-* "$CLI/lib/"
+  cp "$REPO/bin/hyprchroma" "$CLI/bin/hyprchroma"
+  cp -r "$REPO/share" "$CLI/share"
+  cat > "$CLI/lib/hyprchroma-state" <<'E'
+#!/usr/bin/env bash
+prev=""
+for a in "$@"; do
+  case $a in prepare-lock) lock=1 ;; write-file) writing=1 ;; esac
+  case $prev in
+    --path) [[ ${lock:-0} == 1 ]] && : > "$a"
+            [[ ${writing:-0} == 1 ]] && cat > "$a" ;;
+  esac
+  prev=$a
+done
+exit 0
+E
+  chmod +x "$CLI/lib/hyprchroma-state"
+  printf '#!/usr/bin/env bash\n[[ $1 == --info ]] && echo "{}"\nexit 0\n' > "$CLI/lib/hyprchroma-dark-reader"
+  chmod +x "$CLI/lib/hyprchroma-dark-reader"
+  settings=$XDG_STATE_HOME/hyprchroma/settings.json
+  run() { bash "$CLI/bin/hyprchroma" "$@" >/dev/null 2>&1; }
+
+  run --set-accent=blue --quiet
+  chk "--set-accent records the choice" "$(jq -r '.accent' "$settings")" "blue"
+  chk "...beside the framework settings, not instead of them" \
+    "$(jq -r '.accent + "," + (.frameworks | has("gtk") | tostring)' "$settings" 2>/dev/null || echo none)" "blue,true"
+  blue=$("$CLI/lib/hyprchroma-palette" blue)
+  chk "...and the synchronized GTK stylesheet uses that color as its accent" \
+    "$(grep -c "@define-color accent_bg_color $blue;" "$HOME/.config/gtk-4.0/hyprchroma.css")" "1"
+  run --set-accent=theme --quiet
+  chk "--set-accent=theme records the theme" "$(jq -r '.accent' "$settings")" "theme"
+  chk "...and the stylesheet follows the theme's own accent again" \
+    "$(grep -c "@define-color accent_bg_color $("$CLI/lib/hyprchroma-palette" accent);" "$HOME/.config/gtk-4.0/hyprchroma.css")" "1"
+  run --set-accent=cyan --quiet
+  before=$(cat "$settings")
+  bash "$CLI/bin/hyprchroma" --set-accent=bogus --quiet >/dev/null 2>&1
+  chk "an unknown accent is refused with a non-zero exit" "$?" "1"
+  chk "...and the setting is left as it was" "$([[ $(cat "$settings") == "$before" ]] && echo same || echo changed)" "same"
+)
+
+echo "--- wiring ---"
+chk "the sync fingerprint includes the resolved accent, so a change always rewrites files" \
+  "$(grep -c '"\$bright_foreground" "\$accent"' bin/hyprchroma)" "1"
+chk "the daemon already watches settings.json for changes" \
+  "$(grep -c 'theme.name", state_dir / "settings.json")' lib/hyprchroma-state)" "1"
+chk "a held lock is waited for, not skipped, for an accent change" \
+  "$(grep -c 'force == 0 && -z \$set_enabled && -z \$set_accent' bin/hyprchroma)" "1"
