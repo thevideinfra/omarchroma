@@ -332,6 +332,10 @@ USAGE
   esac
 done
 
+if [[ -n $set_accent && ( -n $set_enabled || $target != all ) ]]; then
+  fail "--set-accent cannot be combined with --target or --set-enabled"
+fi
+
 log() {
   (( quiet )) || printf 'Hyprchroma: %s\n' "$*"
 }

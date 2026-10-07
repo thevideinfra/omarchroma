@@ -124,6 +124,13 @@ E
   bash "$CLI/bin/hyprchroma" --set-accent=bogus --quiet >/dev/null 2>&1
   chk "an unknown accent is refused with a non-zero exit" "$?" "1"
   chk "...and the setting is left as it was" "$([[ $(cat "$settings") == "$before" ]] && echo same || echo changed)" "same"
+  before=$(cat "$settings")
+  bash "$CLI/bin/hyprchroma" --set-accent=blue --target=gtk --quiet >/dev/null 2>&1
+  chk "--set-accent with --target is refused with a non-zero exit" "$?" "1"
+  chk "...and settings.json is untouched" "$([[ $(cat "$settings") == "$before" ]] && echo same || echo changed)" "same"
+  bash "$CLI/bin/hyprchroma" --set-accent=blue --set-enabled=true --target=gtk --quiet >/dev/null 2>&1
+  chk "--set-accent with --set-enabled is refused with a non-zero exit" "$?" "1"
+  chk "...and settings.json is untouched again" "$([[ $(cat "$settings") == "$before" ]] && echo same || echo changed)" "same"
 )
 
 echo "--- wiring ---"

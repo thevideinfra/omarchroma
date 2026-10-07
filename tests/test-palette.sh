@@ -27,7 +27,7 @@ mkdir -p "$T/hyprchroma"
 # --- the file format is complete and self-describing ----------------------
 ./$P --template > "$T/hyprchroma/palette.toml"
 chk "the template carries every required key" \
-  "$(grep '^[a-z_]* = "#' "$T/hyprchroma/palette.toml" | grep -vc '^\(cyan\|orange\) =')" "20"
+  "$(grep -c '^[a-z_]* = "#' "$T/hyprchroma/palette.toml")" "20"
 chk "a file source wins over Omarchy" \
   "$(XDG_CONFIG_HOME=$T ./$P --source)" "$T/hyprchroma/palette.toml"
 

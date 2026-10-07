@@ -673,12 +673,9 @@ Panel {
     }
   }
 
-  // Equal-width choice boxes; the chosen one is tinted and outlined in the
-  // accent.
   // The theme's own accent, then the other colors of its palette, each drawn in
   // its real color. The chosen one is ringed.
   component AccentPicker: Flow {
-    id: picker
     spacing: root.sp(5)
 
     Repeater {
@@ -743,6 +740,8 @@ Panel {
     }
   }
 
+  // Equal-width choice boxes; the chosen one is tinted and outlined in the
+  // accent.
   component Segmented: Grid {
     id: segmented
     property var choices: []
