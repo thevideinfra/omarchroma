@@ -725,7 +725,8 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(root.sp(320))
+    // Width gives up half as much as spacing, so labels keep fitting.
+    contentWidth: panel.fittedContentWidth(Math.round(Style.space(320) * (0.5 + 0.5 * root.densityScale)))
     contentHeight: panel.fittedContentHeight(content.implicitHeight)
 
     PanelKeyCatcher {
