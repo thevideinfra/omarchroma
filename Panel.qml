@@ -85,6 +85,10 @@ Panel {
     }
   }
 
+  // The list of what to close is on the panel itself now, so it is asked for as
+  // the panel opens rather than when a view is.
+  onOpenedChanged: if (root.opened && root.ready) root.refreshStaleApps()
+
   // Asked once as the shell starts, not only when the panel opens: the bar icon
   // shows a pending update, so it has to know about one without being clicked.
   Component.onCompleted: presenceProcess.running = true
@@ -123,6 +127,7 @@ Panel {
         root.installedVersion = ""
         root.staleWindows = ({})
         root.staleApps = []
+        root.darkReaderPending = []
       }
     }
   }
@@ -231,6 +236,10 @@ Panel {
   // How many windows each has open, since that is what there is to close. An
   // app missing from it -- a service older than the counts -- has one.
   property var staleWindows: ({})
+  // Browsers whose Dark Reader is waiting for them to close: its storage cannot
+  // be written under an open browser. Not stale windows -- Omarchy themes the
+  // browser itself -- but still a thing to close, so the list below names them.
+  property var darkReaderPending: []
   readonly property int staleWindowCount: {
     var counts = root.staleWindows
     var total = 0
@@ -254,6 +263,40 @@ Panel {
   function validStaleName(name) {
     return typeof name === "string" && name.length > 0 && name.length <= 64
       && !/[\u0000-\u001f\u007f<>&]/.test(name)
+  }
+
+  // Everything the user has to close for the new theme, one entry per
+  // application: stale windows first, then browsers Dark Reader waits on. A
+  // browser in both is named once, with both reasons.
+  readonly property var restartItems: {
+    var items = []
+    var key = function(name) { return String(name).toLowerCase().replace(/[^a-z0-9]/g, "") }
+    var seen = {}
+    for (var i = 0; i < root.staleApps.length; i++) {
+      var name = root.staleApps[i]
+      seen[key(name)] = items.length
+      items.push({ name: name, windows: root.windowsOf(name, root.staleWindows), darkReader: false })
+    }
+    for (var j = 0; j < root.darkReaderPending.length; j++) {
+      var browser = root.darkReaderPending[j]
+      var at = seen[key(browser)]
+      if (at !== undefined) items[at].darkReader = true
+      else items.push({ name: browser, windows: 0, darkReader: true })
+    }
+    return items
+  }
+  readonly property int restartCount: {
+    var total = 0
+    for (var i = 0; i < root.restartItems.length; i++)
+      total += Math.max(1, root.restartItems[i].windows)
+    return total
+  }
+
+  function restartDetail(item) {
+    var parts = []
+    if (item.windows > 0) parts.push(root.windowsPhrase(item.windows))
+    if (item.darkReader) parts.push("Dark Reader waits")
+    return parts.join(" · ")
   }
 
   function windowsPhrase(count) {
@@ -382,8 +425,7 @@ Panel {
     // PanelKeyCatcher consumes h/j/k/l before a panel sees them -- the same
     // reason the framework rows are numbered.
     if (key === "/") {
-      root.guideOpen = !root.guideOpen
-      if (root.guideOpen) root.refreshStaleApps()
+      if (root.hiddenFrameworks.length > 0) root.guideOpen = !root.guideOpen
       return
     }
     // While the guide is up, a digit means one of the removed frameworks listed
@@ -501,6 +543,9 @@ Panel {
     onLoaded: {
       try {
         var status = JSON.parse(text())
+        var waiting = status.darkReaderPending
+        root.darkReaderPending = Array.isArray(waiting)
+          ? waiting.filter(root.validStaleName).slice(0, 16) : []
         var names = status.staleApps
         if (Array.isArray(names)) {
           var counts = status.staleWindows
@@ -941,7 +986,7 @@ Panel {
           }
         }
 
-        // ---------- Applications to close, and what was removed ----------
+        // ---------- Removed frameworks, to put back ----------
         Column {
           id: guide
           visible: root.guideOpen && !root.settingsOpen
@@ -949,21 +994,8 @@ Panel {
           spacing: root.sp(8)
 
           SectionLabel {
-            icon: "󰖯"
-            text: (root.staleWindowCount > 0 ? root.windowsPhrase(root.staleWindowCount) + " to close"
-                                             : "Applications to close").toUpperCase()
-              + (root.hiddenFrameworks.length > 0 ? " · REMOVED" : "")
-          }
-
-          // The heading already says what the list is, so nothing is said twice.
-          // Only the empty case needs a word, because an empty list says nothing.
-          Text {
-            visible: root.staleApps.length === 0
-            width: guide.width
-            text: "Nothing to close."
-            color: Color.muted
-            font.family: root.fontFamily
-            font.pixelSize: root.fontCaption
+            icon: "󰆴"
+            text: "REMOVED"
           }
 
           // Removing a framework takes its row out of the panel, so this is the only
@@ -1056,53 +1088,6 @@ Panel {
             }
           }
 
-          Repeater {
-            model: root.staleApps.slice(0, root.staleShown)
-
-            // Each app with how many of its windows are open, spelled out so it
-            // is not taken for a key like the numbers beside removed frameworks.
-            delegate: Item {
-              id: staleRow
-              required property string modelData
-              width: guide.width
-              height: Math.max(staleName.implicitHeight, staleRowWindows.implicitHeight)
-
-              Text {
-                id: staleName
-                text: "•  " + staleRow.modelData
-                textFormat: Text.PlainText
-                color: root.fg
-                font.family: root.fontFamily
-                font.pixelSize: root.fontCaption
-                anchors.left: parent.left
-                anchors.right: staleRowWindows.left
-                anchors.rightMargin: root.sp(10)
-                elide: Text.ElideRight
-              }
-
-              Text {
-                id: staleRowWindows
-                text: root.windowsPhrase(root.windowsOf(staleRow.modelData))
-                // The name's color, dimmed: Color.muted all but vanishes on some
-                // themes' panels, and this is a count to read, not a hint.
-                color: root.fg
-                opacity: 0.7
-                font.family: root.fontFamily
-                font.pixelSize: root.fontCaption
-                anchors.right: parent.right
-              }
-            }
-          }
-
-          Text {
-            visible: root.staleApps.length > root.staleShown
-            width: guide.width
-            text: "and " + (root.staleApps.length - root.staleShown) + " more"
-            color: Color.muted
-            font.family: root.fontFamily
-            font.pixelSize: root.fontCaption
-          }
-
           ActionCard {
             width: guide.width
             text: "Back  (/)"
@@ -1136,10 +1121,47 @@ Panel {
         }
 
         // ---------- Frameworks ----------
-        SectionLabel {
+        Item {
           visible: root.mainView && root.ready
-          icon: "󰏘"
-          text: "FRAMEWORKS"
+          width: content.width
+          implicitHeight: Math.max(frameworksLabel.implicitHeight, syncButton.implicitHeight)
+
+          SectionLabel {
+            id: frameworksLabel
+            icon: "󰏘"
+            text: "FRAMEWORKS"
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+          }
+
+          // Sync everything that is switched on, now. Also the "r" key.
+          Text {
+            id: syncButton
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: "󰑐"
+            color: syncMouse.containsMouse && !refreshProcess.running ? root.accent : root.fg
+            opacity: refreshProcess.running ? 0.4 : (syncMouse.containsMouse ? 1.0 : 0.7)
+            font.family: root.fontFamily
+            font.pixelSize: Math.round(root.fontTitle * 1.2)
+
+            MouseArea {
+              id: syncMouse
+              anchors.fill: parent
+              anchors.margins: -root.sp(4)
+              hoverEnabled: true
+              enabled: !refreshProcess.running
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.refresh("all")
+            }
+
+            PanelToolTip {
+              visible: syncMouse.containsMouse
+              text: "Sync everything now  (r)"
+              fontFamily: root.fontFamily
+            }
+          }
         }
 
         Repeater {
@@ -1253,27 +1275,174 @@ Panel {
           foreground: root.fg
         }
 
-        ActionCard {
+        // ---------- What to close for the new theme ----------
+        Item {
           visible: root.mainView && root.ready
           width: content.width
-          text: "Refresh enabled  (r)"
-          iconText: "󰑐"
-          enabled: !refreshProcess.running
-          onClicked: root.refresh("all")
+          implicitHeight: Math.max(restartLabel.implicitHeight, restartBadge.implicitHeight)
+
+          SectionLabel {
+            id: restartLabel
+            icon: "󰖯"
+            text: "CLOSE TO APPLY"
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+          }
+
+          Rectangle {
+            id: restartBadge
+            visible: root.restartCount > 0
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            readonly property color alertColor: root.bar ? root.bar.urgent : Color.urgent
+            width: Math.max(height, restartBadgeText.implicitWidth + root.sp(10))
+            height: restartBadgeText.implicitHeight + root.sp(4)
+            radius: height / 2
+            color: Util.alpha(alertColor, 0.15)
+            border.width: 1
+            border.color: Util.alpha(alertColor, 0.45)
+
+            Text {
+              id: restartBadgeText
+              anchors.centerIn: parent
+              textFormat: Text.PlainText
+              text: String(root.restartCount)
+              color: restartBadge.alertColor
+              font.family: root.fontFamily
+              font.pixelSize: root.fontCaption
+              font.bold: true
+            }
+          }
         }
 
-        // Reachable by mouse as well as by "/", and carries the count so the
-        // number of windows waiting is visible without opening it.
-        ActionCard {
-          visible: root.mainView && root.ready
+        // Nothing waiting is said once, as a row, rather than leaving a heading
+        // over empty space.
+        Rectangle {
+          visible: root.mainView && root.ready && root.restartItems.length === 0
           width: content.width
-          text: root.staleWindowCount > 0
-            ? root.windowsPhrase(root.staleWindowCount) + " to close  (/)"
-            : "Nothing to close  (/)"
-          iconText: "󰖯"
-          onClicked: {
-            root.refreshStaleApps()
-            root.guideOpen = true
+          height: Math.max(Math.round(Style.spacing.controlHeight * root.densityScale),
+                           upToDate.implicitHeight + root.sp(8))
+          radius: root.sp(7)
+          color: Util.alpha(root.fg, 0.05)
+          border.width: 1
+          border.color: Util.alpha(root.fg, 0.12)
+
+          Row {
+            id: upToDate
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.left: parent.left
+            anchors.leftMargin: root.sp(10)
+            spacing: root.sp(10)
+
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              width: root.sp(22)
+              horizontalAlignment: Text.AlignHCenter
+              textFormat: Text.PlainText
+              text: "󰄬"
+              color: root.accent
+              font.family: root.fontFamily
+              font.pixelSize: root.fontBody
+            }
+
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: "Everything shows the current theme"
+              color: Color.muted
+              font.family: root.fontFamily
+              font.pixelSize: root.fontCaption
+            }
+          }
+        }
+
+        Repeater {
+          model: root.restartItems.slice(0, root.staleShown)
+
+          delegate: Rectangle {
+            id: waiting
+            required property var modelData
+            visible: root.mainView && root.ready
+            readonly property color alertColor: root.bar ? root.bar.urgent : Color.urgent
+            width: content.width
+            height: visible ? Math.max(Math.round(Style.spacing.controlHeight * root.densityScale),
+                                       waitingRow.implicitHeight + root.sp(8)) : 0
+            radius: root.sp(7)
+            color: Util.alpha(root.fg, 0.05)
+            border.width: 1
+            border.color: Util.alpha(waiting.alertColor, 0.35)
+
+            Row {
+              id: waitingRow
+              anchors.verticalCenter: parent.verticalCenter
+              anchors.left: parent.left
+              anchors.leftMargin: root.sp(10)
+              anchors.right: parent.right
+              anchors.rightMargin: root.sp(10)
+              spacing: root.sp(10)
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: root.sp(22)
+                horizontalAlignment: Text.AlignHCenter
+                textFormat: Text.PlainText
+                text: "●"
+                color: waiting.alertColor
+                font.family: root.fontFamily
+                font.pixelSize: root.fontCaption
+              }
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                id: waitingName
+                width: parent.width - root.sp(22) - waitingDetail.implicitWidth - 2 * parent.spacing
+                textFormat: Text.PlainText
+                text: waiting.modelData.name
+                color: root.fg
+                font.family: root.fontFamily
+                font.pixelSize: root.fontBody
+                elide: Text.ElideRight
+              }
+
+              Text {
+                id: waitingDetail
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: root.restartDetail(waiting.modelData)
+                color: root.fg
+                opacity: 0.7
+                font.family: root.fontFamily
+                font.pixelSize: root.fontCaption
+              }
+            }
+          }
+        }
+
+        Text {
+          visible: root.mainView && root.ready && root.restartItems.length > root.staleShown
+          width: content.width
+          text: "and " + (root.restartItems.length - root.staleShown) + " more"
+          color: Color.muted
+          font.family: root.fontFamily
+          font.pixelSize: root.fontCaption
+        }
+
+        // Where a removed framework is put back: the only trace it leaves.
+        Text {
+          visible: root.mainView && root.ready && root.hiddenFrameworks.length > 0
+          width: content.width
+          textFormat: Text.PlainText
+          text: root.hiddenFrameworks.length + " removed \u00b7 restore  (/)"
+          color: removedMouse.containsMouse ? root.accent : Color.muted
+          font.family: root.fontFamily
+          font.pixelSize: root.fontCaption
+
+          MouseArea {
+            id: removedMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.guideOpen = true
           }
         }
       }

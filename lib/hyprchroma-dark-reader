@@ -533,6 +533,12 @@ BROWSERS = {
               "roots": ["~/.config/BraveSoftware/Brave-Browser"],
               "executables": ["brave", "brave-browser"],
               "desktops": ["brave-browser.desktop"]},
+    # Brave Origin runs /opt/brave-origin-bin/brave, so its process is named
+    # plain "brave" -- the same name as Brave's -- and keeps its profile apart.
+    "brave-origin": {"name": "Brave Origin", "family": "chromium",
+                     "roots": ["~/.config/BraveSoftware/Brave-Origin"],
+                     "executables": ["brave", "brave-origin"],
+                     "desktops": ["brave-origin.desktop"]},
     "vivaldi": {"name": "Vivaldi", "family": "chromium",
                 "roots": ["~/.config/vivaldi"],
                 "executables": ["vivaldi-bin", "vivaldi-stable"],

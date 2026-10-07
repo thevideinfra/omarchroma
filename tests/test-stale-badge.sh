@@ -113,18 +113,18 @@ chk "the panel watches status.json for it, rather than polling" \
   "$(grep -c 'path: root.statusPath' Panel.qml),$(awk '/id: statusFile/,/^  }/' Panel.qml | grep -c 'watchChanges: true')" "1,1"
 chk "the icon turns the theme's urgent color while any are left" \
   "$(grep -c 'active: root.alertCount > 0' BarWidget.qml)" "1"
-chk "...counting windows, not applications" \
-  "$(grep -c 'panelLoader.item.staleWindowCount$' BarWidget.qml)" "1"
+chk "...counting what there is to close: windows, and browsers Dark Reader waits on" \
+  "$(grep -c 'panelLoader.item.restartCount$' BarWidget.qml)" "1"
 chk "the panel takes each app's windows from status.json, beside the list" \
   "$(awk '/id: statusFile/,/^  }/' Panel.qml | grep -c 'var counts = status.staleWindows')" "1"
 chk "...counting one for an app a service older than the counts lists without them" \
   "$(grep -c 'count <= 999 && count === Math.floor(count))' Panel.qml),$(grep -c '      ? count : 1$' Panel.qml)" "1,1"
-chk "...totals them for the button and the heading" \
-  "$(grep -c 'root.windowsPhrase(root.staleWindowCount)' Panel.qml)" "2"
+chk "...spells each app's windows out, and totals them for the badge" \
+  "$(grep -c 'parts.push(root.windowsPhrase(item.windows))' Panel.qml),$(grep -c 'total += Math.max(1, root.restartItems\[i\].windows)' Panel.qml)" "1,1"
 chk "...and puts each app's count beside it, in words so it is not taken for a key" \
-  "$(grep -c 'text: root.windowsPhrase(root.windowsOf(staleRow.modelData))' Panel.qml)" "1"
+  "$(grep -c 'text: root.restartDetail(waiting.modelData)' Panel.qml)" "1"
 chk "...readable on every theme: the name's color dimmed, not Color.muted, which all but vanished" \
-  "$(awk '/id: staleRowWindows/,/^              }/' Panel.qml | sed 's|//.*||' | grep -cE 'color: root.fg|opacity: 0.7|Color.muted')" "2"
+  "$(awk '/id: waitingDetail/,/^              }/' Panel.qml | sed 's|//.*||' | grep -cE 'color: root.fg|opacity: 0.7|Color.muted')" "2"
 chk "...with a count raised beside it in that same color" \
   "$(awk '/id: staleBadge/,/^  }/' BarWidget.qml | grep -cE 'color: button.activeColor|visible: root.alertCount > 0')" "2"
 chk "...drawn as the shell draws the glyph, so it is not color-fringed" \

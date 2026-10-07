@@ -20,7 +20,7 @@ trap 'rm -rf "$ROOT"' EXIT
 
 # -- a planted name, drawn by the panel ----------------------------------------
 cd -- "$REPO" || exit 1
-format=$(awk '/id: staleName/,/^              }/' Panel.qml | grep -o 'textFormat: Text.PlainText')
+format=$(awk '/id: waitingName/,/^              }/' Panel.qml | grep -o 'textFormat: Text.PlainText')
 chk "the panel draws each stale application's name as plain text" "$format" "textFormat: Text.PlainText"
 validator=$(sed -n '/^  function validStaleName(name) {/,/^  }/p' Panel.qml)
 chk "...and checks each name before keeping it" "$(grep -c 'return typeof name' <<<"$validator")" "1"

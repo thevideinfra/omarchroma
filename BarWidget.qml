@@ -17,8 +17,8 @@ BarWidget {
   // does when a limit is near, and a small raised count says how many. Windows
   // rather than applications, since that is what there is to close: two
   // Vivaldi windows are two, and Vivaldi changes after the second.
-  readonly property int staleCount: panelLoader.item && panelLoader.item.staleWindowCount
-    ? panelLoader.item.staleWindowCount : 0
+  readonly property int staleCount: panelLoader.item && panelLoader.item.restartCount
+    ? panelLoader.item.restartCount : 0
   // A service older than this plugin is one more thing to deal with, and says
   // so the same way: the icon in the urgent color, counting it as one. The
   // panel's Update button, lit in the same color, is what clears it.
@@ -109,7 +109,7 @@ BarWidget {
         + (root.updatePending ? "1 service update pending" : "")
         + (root.updatePending && root.staleCount > 0 ? ", and " : "")
         + (root.staleCount > 0
-            ? panelLoader.item.windowsPhrase(root.staleCount) + " to close for the new theme" : "")
+            ? root.staleCount + " to close for the new theme" : "")
     onPressed: function(buttonCode) {
       if (buttonCode === Qt.LeftButton) root.togglePanel()
     }
