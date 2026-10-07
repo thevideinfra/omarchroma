@@ -852,6 +852,8 @@ Panel {
                   anchors.verticalCenter: parent.verticalCenter
                   textFormat: Text.PlainText
                   text: gone.modelData.icon
+                  width: Style.space(22)
+                  horizontalAlignment: Text.AlignHCenter
                   color: root.fg
                   opacity: 0.65
                   font.family: root.fontFamily
@@ -860,7 +862,7 @@ Panel {
 
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
-                  width: parent.width - Style.space(20) - goneKey.width - Style.font.body
+                  width: parent.width - Style.space(22) - goneKey.width - 2 * parent.spacing
                   textFormat: Text.PlainText
                   text: gone.modelData.label
                   color: root.fg
@@ -1018,6 +1020,8 @@ Panel {
                 anchors.verticalCenter: parent.verticalCenter
                 textFormat: Text.PlainText
                 text: row.modelData.icon
+                width: Style.space(22)
+                horizontalAlignment: Text.AlignHCenter
                 color: root.targetEnabled(row.modelData.target) ? root.accent : root.fg
                 opacity: root.targetEnabled(row.modelData.target) ? 1.0 : 0.65
                 font.family: root.fontFamily
@@ -1027,7 +1031,7 @@ Panel {
               Text {
                 id: label
                 anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - toggle.width - keyHint.width - Style.font.body - 3 * parent.spacing
+                width: parent.width - icon.width - toggle.width - keyHint.width - 3 * parent.spacing
                 textFormat: Text.PlainText
                 text: row.modelData.label
                 color: root.fg
