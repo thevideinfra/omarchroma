@@ -54,6 +54,35 @@ rm -f "$S/hyprchroma/settings.json"; mkfifo "$S/hyprchroma/settings.json"
 chk "a fifo planted as the settings file does not hang the resolver" "$(accent)" "#111111"
 rm -f "$S/hyprchroma/settings.json"
 
+echo "--- the choice tints surfaces and selection ---"
+key() { XDG_CONFIG_HOME=$T XDG_STATE_HOME=$S timeout 5 ./$P "$1"; }
+write_palette optional
+rm -f "$S/hyprchroma/settings.json"
+chk "no choice: surfaces are the theme's own" "$(key background)" "#000000"
+set_accent '{"accent":"theme"}'
+chk "theme: no tint on the background" "$(key background)" "#000000"
+chk "theme: no tint on the selection" "$(key selection)" "#000000"
+set_accent '{"accent":"red"}'
+chk "red: background tinted 8% (255*0.08 = 20 -> 0x14)" "$(key background)" "#140000"
+chk "...lighter_background too" "$(key lighter_background)" "#140000"
+chk "...dark_background too" "$(key dark_background)" "#140000"
+chk "...darker_background too" "$(key darker_background)" "#140000"
+chk "...selection tinted 25% (255*0.25 = 64 -> 0x40)" "$(key selection)" "#400000"
+chk "...the accent itself is the solid color" "$(key accent)" "#ff0000"
+chk "...text is untouched" "$(key foreground)" "#000000"
+chk "...selection text is untouched" "$(key selection_foreground)" "#000000"
+chk "...muted is untouched" "$(key muted)" "#000000"
+chk "...status colors are untouched" "$(key green)" "#000000"
+set_accent '{"accent":"blue"}'
+chk "blue: background tinted toward blue" "$(key background)" "#000014"
+# A base that is not black, so the mix really blends: 0x10 -> 16*0.92 + 255*0.08.
+sed -i 's/^background = .*/background = "#101010"/' "$T/hyprchroma/palette.toml"
+set_accent '{"accent":"red"}'
+chk "a non-black base blends per channel (16 -> 35, 16 -> 15)" "$(key background)" "#230f0f"
+write_palette
+set_accent '{"accent":"cyan"}'
+chk "a color the palette lacks tints nothing" "$(key background)" "#000000"
+
 echo "--- every way of asking sees it ---"
 set_accent '{"accent":"blue"}'
 chk "--all" "$(XDG_CONFIG_HOME=$T XDG_STATE_HOME=$S ./$P --all | grep -c "^accent	#0000ff$")" "1"
@@ -115,10 +144,18 @@ E
   blue=$("$CLI/lib/hyprchroma-palette" blue)
   chk "...and the synchronized GTK stylesheet uses that color as its accent" \
     "$(grep -c "@define-color accent_bg_color $blue;" "$HOME/.config/gtk-4.0/hyprchroma.css")" "1"
+  window_blue=$(grep -o 'window_bg_color #[0-9A-Fa-f]*' "$HOME/.config/gtk-4.0/hyprchroma.css" | head -1)
+  select_blue=$(grep -o 'theme_selected_bg_color #[0-9A-Fa-f]*' "$HOME/.config/gtk-4.0/hyprchroma.css" | head -1)
   run --set-accent=theme --quiet
   chk "--set-accent=theme records the theme" "$(jq -r '.accent' "$settings")" "theme"
   chk "...and the stylesheet follows the theme's own accent again" \
     "$(grep -c "@define-color accent_bg_color $("$CLI/lib/hyprchroma-palette" accent);" "$HOME/.config/gtk-4.0/hyprchroma.css")" "1"
+  window_theme=$(grep -o 'window_bg_color #[0-9A-Fa-f]*' "$HOME/.config/gtk-4.0/hyprchroma.css" | head -1)
+  select_theme=$(grep -o 'theme_selected_bg_color #[0-9A-Fa-f]*' "$HOME/.config/gtk-4.0/hyprchroma.css" | head -1)
+  chk "a chosen color moves the window background in the stylesheet" \
+    "$([[ -n $window_blue && $window_blue != "$window_theme" ]] && echo moved || echo same)" "moved"
+  chk "...and the selection color" \
+    "$([[ -n $select_blue && $select_blue != "$select_theme" ]] && echo moved || echo same)" "moved"
   run --set-accent=cyan --quiet
   before=$(cat "$settings")
   bash "$CLI/bin/hyprchroma" --set-accent=bogus --quiet >/dev/null 2>&1

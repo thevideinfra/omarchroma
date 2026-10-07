@@ -100,6 +100,25 @@ ACCENT_CHOICES = ("blue", "cyan", "green", "magenta", "yellow", "red", "orange")
 OPTIONAL_ACCENTS = ("cyan", "orange")
 MAX_SETTINGS = 64 * 1024
 
+# The chosen color is mixed into the theme's own colors by these fractions. The
+# surfaces get a little, so windows and headers take a hue while staying dark
+# (or light); the selection gets more, so a selected row is visibly that color.
+# Kept here, named, so the strength can be tuned in one place. selection_foreground
+# is not recomputed, so a strong mix can lower contrast on some themes.
+SURFACE_TINT = 0.08
+SELECTION_TINT = 0.25
+SURFACE_KEYS = ("background", "lighter_background", "dark_background", "darker_background")
+
+
+def mix(base: str, color: str, amount: float) -> str:
+    """base moved `amount` of the way toward color, per sRGB channel."""
+    channels = []
+    for offset in (1, 3, 5):
+        low = int(base[offset:offset + 2], 16)
+        high = int(color[offset:offset + 2], 16)
+        channels.append(round(low * (1 - amount) + high * amount))
+    return "#{:02x}{:02x}{:02x}".format(*channels)
+
 
 def accent_setting() -> str:
     """The accent the user chose, or "theme".
@@ -132,12 +151,17 @@ def accent_setting() -> str:
 
 
 def with_accent(resolved: dict) -> dict:
-    """Swap in the chosen accent. A choice the palette does not define leaves
-    the theme's own, so a theme change never leaves this without an accent."""
+    """Apply the chosen color: it becomes the accent, and is mixed into the
+    surfaces and the selection. A choice the palette does not define leaves
+    everything as the theme has it, so a theme change never leaves this without
+    a usable palette."""
     choice = accent_setting()
     color = resolved.get(choice) if choice != "theme" else None
     if color and HEX.match(color):
         resolved["accent"] = color
+        for key in SURFACE_KEYS:
+            resolved[key] = mix(resolved[key], color, SURFACE_TINT)
+        resolved["selection"] = mix(resolved["selection"], color, SELECTION_TINT)
     return resolved
 
 
