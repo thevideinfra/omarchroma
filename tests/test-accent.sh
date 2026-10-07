@@ -196,5 +196,6 @@ chk "the swatches come from the theme's palette" \
   "$(grep -c 'model: themePalette.available' Panel.qml)" "1"
 chk "the panel's own accent is untouched by the choice" \
   "$(grep -c 'readonly property color accent: Color.accent' Panel.qml)" "1"
-chk "the picker says what it applies to" \
-  "$(grep -c 'Applies to synchronized apps, not this panel' Panel.qml)" "1"
+chk "the picker says what it changes, and that it leaves the panel alone" \
+  "$(grep -c "Tints windows and headers, highlights selections and accents in synchronized apps. Doesn't change this panel." Panel.qml)" "1"
+chk "the section is called COLOR" "$(grep -c 'text: "COLOR"' Panel.qml)" "1"

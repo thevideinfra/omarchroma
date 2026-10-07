@@ -732,7 +732,7 @@ Panel {
 
         PanelToolTip {
           visible: swatchMouse.containsMouse
-          text: swatch.isTheme ? "Follow the theme's accent"
+          text: swatch.isTheme ? "Follow the theme's colors"
             : swatch.modelData.charAt(0).toUpperCase() + swatch.modelData.slice(1)
           fontFamily: root.fontFamily
         }
@@ -1041,14 +1041,14 @@ Panel {
 
           SectionLabel {
             icon: ""
-            text: "ACCENT"
+            text: "COLOR"
           }
 
           AccentPicker { width: settingsView.width }
 
           Text {
             width: settingsView.width
-            text: "Applies to synchronized apps, not this panel."
+            text: "Tints windows and headers, highlights selections and accents in synchronized apps. Doesn't change this panel."
             color: Color.muted
             font.family: root.fontFamily
             font.pixelSize: root.fontCaption
