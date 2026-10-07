@@ -1041,7 +1041,7 @@ Panel {
           }
 
           SectionLabel {
-            icon: ""
+            icon: ""
             text: "ACCENT"
           }
 
