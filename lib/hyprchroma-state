@@ -2061,6 +2061,12 @@ def window_executable(pid):
         return None
 
 
+def takes_no_theme(klass):
+    """Steam and its games draw their own interface and read no theme from the
+    desktop, so closing one would change nothing."""
+    return klass == "steam" or klass.startswith("steam_")
+
+
 def stale_open_windows(since=None):
     """{name: windows open} for apps whose process started before the current
     theme was selected, so they are still drawing the previous one. Counted
@@ -2087,6 +2093,8 @@ def stale_open_windows(since=None):
     for title, klass, pid in windows:
         started = process_started_at(pid)
         if started is None or started >= since:
+            continue
+        if takes_no_theme(klass):
             continue
         # A terminal, TUI or the shell already picked the theme up when Omarchy
         # told it to; naming it would send someone to restart nothing.

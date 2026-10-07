@@ -53,6 +53,16 @@ chk("closing one of them is recorded, though the list of apps is the same",
 st.record_stale_apps(S, {})
 chk("all closed: it empties rather than disappearing", (recorded(), windows()), ([], {}))
 
+# Steam and its games read no theme, so asking for them to be closed is noise.
+st.open_windows = lambda: [("Steam", "steam", 1), ("Friends List", "steam", 1),
+                           ("Some Game", "steam_app_730", 2), ("Signal", "signal", 3)]
+st.process_started_at = lambda pid: 50
+st.omarchy_reloaded_executables = lambda: set()
+st.gtk_portal_pids = lambda: set()
+st.window_executable = lambda pid: "x"
+chk("Steam and its games are never listed to close",
+    sorted(st.stale_open_windows(since=100)), ["Signal"])
+
 # The daemon's pass keeps it current on every window event.
 calls = []
 st.refresh_idle_apps = lambda since=None: None

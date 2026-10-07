@@ -125,7 +125,7 @@ probe=$(mktemp); trap 'rm -f "$probe"' EXIT
 sed 's/adw-gtk-theme/definitely-not-a-package/g; s/python-plyvel/also-not-a-package/g' $S > "$probe"
 chmod +x "$probe"
 want=$(printf 'y\nn\nno\n' | timeout 30 "$probe" 2>&1)
-chk "a missing dependency is named" "$(grep -c 'These are missing' <<<"$want")" "1"
+chk "a missing dependency is named" "$(grep -c 'packages it uses are missing' <<<"$want")" "1"
 chk "with what it is for" "$(grep -c 'GTK 3 apps follow the theme' <<<"$want")" "1"
 chk "and the command to get it" "$(grep -c 'sudo pacman -S --needed' <<<"$want")" "1"
 chk "declining leaves it uninstalled and says so" \

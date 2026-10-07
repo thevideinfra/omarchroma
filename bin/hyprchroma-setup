@@ -198,8 +198,11 @@ if [[ $want_dark == yes ]] && ! pacman -Qq python-plyvel &>/dev/null; then
   explain+=("python-plyvel  Dark Reader's settings live in a LevelDB. Without it, Chromium browsers are skipped.")
 fi
 
+# Hyprchroma itself is not downloaded: it is built from this checkout next.
+# What pacman is asked for here is only what it uses.
 if (( ${#missing[@]} )); then
-  say "These are missing:"
+  say "Hyprchroma itself is built from this folder, with nothing downloaded."
+  say "These packages it uses are missing:"
   printf '  %s\n' "${explain[@]}"
   say ""
   say "  sudo pacman -S --needed ${missing[*]}"
