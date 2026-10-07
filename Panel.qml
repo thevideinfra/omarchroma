@@ -264,6 +264,10 @@ Panel {
   // is as long as the user has windows open, and growing the panel by one row
   // per application would push the frameworks off the screen.
   property bool guideOpen: false
+  // The gear's view: density and font size, in place of everything below the
+  // header. Mutually exclusive with the guide, so there is one thing on screen.
+  property bool settingsOpen: false
+  readonly property bool mainView: !root.guideOpen && !root.settingsOpen
 
   // However many are open, the panel stays a readable size and says how many
   // it did not name.
@@ -367,6 +371,8 @@ Panel {
       root.installDependency()
       return
     }
+    // Settings has no key of its own: digits and "r" belong to the main view.
+    if (root.settingsOpen) return
     // Nothing below this can work without hyprchroma: the guide lists
     // applications a framework toggle left stale, and there is no framework
     // toggle without the service. A key that would open it is ignored rather
@@ -509,6 +515,25 @@ Panel {
     onFileChanged: reload()
   }
 
+  // ---- Display settings (shell.json, set from the gear view) ----
+  // Roomy is the shell's stock panel size; the others shrink spacing and, half
+  // as fast, text, so Compact stays readable. The font size scales text on top.
+  readonly property string density: String(setting("density", "normal"))
+  readonly property string fontSize: String(setting("fontSize", "normal"))
+  readonly property real densityScale: density === "compact" ? 0.65 : (density === "roomy" ? 1.0 : 0.8)
+  readonly property real fontScale: (0.5 + 0.5 * densityScale)
+    * (fontSize === "small" ? 0.9 : (fontSize === "large" ? 1.1 : 1.0))
+  readonly property real fontDisplay: Math.round(Style.font.display * fontScale)
+  readonly property real fontTitle: Math.round(Style.font.title * fontScale)
+  readonly property real fontBody: Math.round(Style.font.body * fontScale)
+  readonly property real fontCaption: Math.max(9, Math.round(Style.font.caption * fontScale))
+
+  function sp(px) { return Style.space(px * densityScale) }
+
+  function setSetting(key, value) {
+    Quickshell.execDetached(["omarchy", "bar", "set", root.moduleName, key, JSON.stringify(value), "--json"])
+  }
+
   // The look follows Tandem and omaudiopanel: a hero header with the version
   // and a repository link, dim-icon section titles in letter-spaced capitals,
   // outlined cards, and one highlight color -- the theme's accent -- for
@@ -526,7 +551,7 @@ Panel {
     id: section
     property string icon: ""
     property string text: ""
-    spacing: Style.space(7)
+    spacing: root.sp(7)
 
     Text {
       anchors.verticalCenter: parent.verticalCenter
@@ -535,7 +560,7 @@ Panel {
       color: root.fg
       opacity: 0.65
       font.family: root.fontFamily
-      font.pixelSize: Math.round(Style.font.caption * 1.2)
+      font.pixelSize: Math.round(root.fontCaption * 1.2)
     }
 
     Text {
@@ -544,7 +569,7 @@ Panel {
       text: section.text
       color: Qt.darker(root.fg, 1.4)
       font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
+      font.pixelSize: root.fontCaption
       font.bold: true
       font.letterSpacing: 1.2
     }
@@ -557,8 +582,8 @@ Panel {
     property bool checked: false
     property bool busy: false
 
-    implicitWidth: Style.space(34)
-    implicitHeight: Style.space(18)
+    implicitWidth: root.sp(34)
+    implicitHeight: root.sp(18)
     opacity: sw.busy ? 0.5 : 1.0
 
     Rectangle {
@@ -570,7 +595,7 @@ Panel {
       Behavior on color { ColorAnimation { duration: 120 } }
 
       Rectangle {
-        width: parent.height - Style.space(6)
+        width: parent.height - root.sp(6)
         height: width
         radius: width / 2
         anchors.verticalCenter: parent.verticalCenter
@@ -578,6 +603,55 @@ Panel {
         color: sw.checked ? root.accent : Qt.darker(root.fg, 1.4)
         Behavior on x { NumberAnimation { duration: 120 } }
         Behavior on color { ColorAnimation { duration: 120 } }
+      }
+    }
+  }
+
+  // Equal-width choice boxes; the chosen one is tinted and outlined in the
+  // accent.
+  component Segmented: Grid {
+    id: segmented
+    property var choices: []
+    property var selected
+    signal picked(var value)
+
+    spacing: root.sp(6)
+    readonly property real cellWidth: (width - (columns - 1) * spacing) / columns
+
+    Repeater {
+      model: segmented.choices
+
+      Rectangle {
+        id: choice
+        required property var modelData
+        readonly property bool chosen: segmented.selected === modelData.value
+        width: segmented.cellWidth
+        implicitHeight: choiceText.implicitHeight + root.sp(12)
+        radius: root.sp(7)
+        color: chosen
+          ? Util.alpha(root.accent, 0.12)
+          : Util.alpha(root.fg, choiceMouse.containsMouse ? 0.09 : 0.05)
+        border.width: chosen ? 2 : 1
+        border.color: chosen ? root.accent : Util.alpha(root.fg, 0.12)
+
+        Text {
+          id: choiceText
+          anchors.centerIn: parent
+          textFormat: Text.PlainText
+          text: choice.modelData.label
+          color: choice.chosen ? root.accent : root.fg
+          font.family: root.fontFamily
+          font.pixelSize: root.fontCaption
+          font.bold: choice.chosen
+        }
+
+        MouseArea {
+          id: choiceMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: segmented.picked(choice.modelData.value)
+        }
       }
     }
   }
@@ -592,8 +666,8 @@ Panel {
     readonly property color alertColor: root.bar ? root.bar.urgent : Color.urgent
     signal clicked()
 
-    implicitHeight: cardRow.implicitHeight + Style.space(14)
-    radius: Style.space(7)
+    implicitHeight: cardRow.implicitHeight + root.sp(14)
+    radius: root.sp(7)
     opacity: card.enabled ? 1.0 : 0.5
     color: card.alert
       ? Util.alpha(card.alertColor, 0.30)
@@ -606,10 +680,10 @@ Panel {
       id: cardRow
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left
-      anchors.leftMargin: Style.space(10)
+      anchors.leftMargin: root.sp(10)
       anchors.right: parent.right
-      anchors.rightMargin: Style.space(10)
-      spacing: Style.space(8)
+      anchors.rightMargin: root.sp(10)
+      spacing: root.sp(8)
 
       Text {
         visible: card.iconText !== ""
@@ -619,17 +693,17 @@ Panel {
         color: cardMouse.containsMouse && card.enabled ? root.accent : root.fg
         opacity: 0.85
         font.family: root.fontFamily
-        font.pixelSize: Style.font.body
+        font.pixelSize: root.fontBody
       }
 
       Text {
         anchors.verticalCenter: parent.verticalCenter
-        width: parent.width - (card.iconText !== "" ? Style.space(26) : 0)
+        width: parent.width - (card.iconText !== "" ? root.sp(26) : 0)
         textFormat: Text.PlainText
         text: card.text
         color: root.fg
         font.family: root.fontFamily
-        font.pixelSize: Style.font.body
+        font.pixelSize: root.fontBody
         elide: Text.ElideRight
       }
     }
@@ -651,7 +725,7 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(320))
+    contentWidth: panel.fittedContentWidth(root.sp(320))
     contentHeight: panel.fittedContentHeight(content.implicitHeight)
 
     PanelKeyCatcher {
@@ -660,7 +734,8 @@ Panel {
       // Escape leaves the guide first, so it never strands the user on a view
       // they cannot back out of.
       onCloseRequested: {
-        if (root.guideOpen) root.guideOpen = false
+        if (root.settingsOpen) root.settingsOpen = false
+        else if (root.guideOpen) root.guideOpen = false
         else root.close()
       }
       onTabRequested: function(direction) { root.switchPanel(direction) }
@@ -669,7 +744,7 @@ Panel {
       Column {
         id: content
         width: parent.width
-        spacing: Style.space(10)
+        spacing: root.sp(10)
 
         // ---------- Hero: icon, name and status, version, repository ----------
         Item {
@@ -682,18 +757,46 @@ Panel {
             text: "󰏘"
             color: root.accent
             font.family: root.fontFamily
-            font.pixelSize: Style.font.display
+            font.pixelSize: root.fontDisplay
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
+          }
+
+          // Swaps everything below the header for the settings view.
+          Text {
+            id: gearButton
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: root.settingsOpen ? "󰅖" : "󰒓"
+            // Larger than the header text and accent on hover, so it reads as
+            // a control rather than decoration.
+            color: gearMouse.containsMouse || root.settingsOpen ? root.accent : root.fg
+            font.family: root.fontFamily
+            font.pixelSize: Math.round(root.fontTitle * 1.45)
+            opacity: gearMouse.containsMouse || root.settingsOpen ? 1.0 : 0.85
+
+            MouseArea {
+              id: gearMouse
+              anchors.fill: parent
+              anchors.margins: -root.sp(4)
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: {
+                root.settingsOpen = !root.settingsOpen
+                root.guideOpen = false
+              }
+            }
           }
 
           Column {
             id: heroLabels
             anchors.left: heroIcon.right
-            anchors.leftMargin: Style.space(12)
-            anchors.right: parent.right
+            anchors.leftMargin: root.sp(12)
+            anchors.right: gearButton.left
+            anchors.rightMargin: root.sp(12)
             anchors.verticalCenter: parent.verticalCenter
-            spacing: Style.space(2)
+            spacing: root.sp(2)
 
             Item {
               width: parent.width
@@ -703,13 +806,13 @@ Panel {
                 id: titleText
                 anchors.left: parent.left
                 anchors.right: infoRow.left
-                anchors.rightMargin: Style.space(8)
+                anchors.rightMargin: root.sp(8)
                 anchors.verticalCenter: parent.verticalCenter
                 textFormat: Text.PlainText
                 text: "omarchroma"
                 color: root.fg
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.title
+                font.pixelSize: root.fontTitle
                 font.bold: true
                 elide: Text.ElideRight
               }
@@ -718,13 +821,13 @@ Panel {
                 id: infoRow
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: Style.space(8)
+                spacing: root.sp(8)
 
                 Rectangle {
                   visible: root.expectedVersion !== ""
                   anchors.verticalCenter: parent.verticalCenter
-                  width: versionText.implicitWidth + Style.space(10)
-                  height: versionText.implicitHeight + Style.space(4)
+                  width: versionText.implicitWidth + root.sp(10)
+                  height: versionText.implicitHeight + root.sp(4)
                   radius: height / 2
                   color: Util.alpha(root.accent, 0.15)
                   border.width: 1
@@ -737,7 +840,7 @@ Panel {
                     text: "v" + root.expectedVersion
                     color: root.accent
                     font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
+                    font.pixelSize: root.fontCaption
                     font.bold: true
                   }
                 }
@@ -750,12 +853,12 @@ Panel {
                   color: repoMouse.containsMouse ? root.accent : root.fg
                   opacity: repoMouse.containsMouse ? 1.0 : 0.6
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.body
+                  font.pixelSize: root.fontBody
 
                   MouseArea {
                     id: repoMouse
                     anchors.fill: parent
-                    anchors.margins: -Style.space(4)
+                    anchors.margins: -root.sp(4)
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: Quickshell.execDetached(["xdg-open", root.repoUrl])
@@ -777,7 +880,7 @@ Panel {
                             : (root.outdated ? "UPDATE AVAILABLE" : "SERVICE NOT RUNNING"))))
               color: Color.muted
               font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
+              font.pixelSize: root.fontCaption
               font.letterSpacing: 0.8
               elide: Text.ElideRight
             }
@@ -788,12 +891,61 @@ Panel {
           foreground: root.fg
         }
 
+        // ---------- Settings ----------
+        Column {
+          id: settingsView
+          visible: root.settingsOpen
+          width: content.width
+          spacing: root.sp(10)
+
+          ActionCard {
+            width: settingsView.width
+            text: "Back"
+            iconText: "󰌍"
+            onClicked: root.settingsOpen = false
+          }
+
+          SectionLabel {
+            icon: "\uf1fc"
+            text: "DENSITY"
+          }
+
+          Segmented {
+            width: settingsView.width
+            columns: 3
+            choices: [
+              { value: "compact", label: "Compact" },
+              { value: "normal", label: "Normal" },
+              { value: "roomy", label: "Roomy" }
+            ]
+            selected: root.density
+            onPicked: function(value) { root.setSetting("density", value) }
+          }
+
+          SectionLabel {
+            icon: "\uf031"
+            text: "FONT SIZE"
+          }
+
+          Segmented {
+            width: settingsView.width
+            columns: 3
+            choices: [
+              { value: "small", label: "Small" },
+              { value: "normal", label: "Normal" },
+              { value: "large", label: "Large" }
+            ]
+            selected: root.fontSize
+            onPicked: function(value) { root.setSetting("fontSize", value) }
+          }
+        }
+
         // ---------- Applications to close, and what was removed ----------
         Column {
           id: guide
-          visible: root.guideOpen
+          visible: root.guideOpen && !root.settingsOpen
           width: content.width
-          spacing: Style.space(8)
+          spacing: root.sp(8)
 
           SectionLabel {
             icon: "󰖯"
@@ -810,7 +962,7 @@ Panel {
             text: "Nothing to close."
             color: Color.muted
             font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
+            font.pixelSize: root.fontCaption
           }
 
           // Removing a framework takes its row out of the panel, so this is the only
@@ -823,7 +975,7 @@ Panel {
             text: "Removed — press the number to put one back"
             color: Color.muted
             font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
+            font.pixelSize: root.fontCaption
           }
 
           Repeater {
@@ -833,8 +985,8 @@ Panel {
               required property var modelData
               required property int index
               width: guide.width
-              height: Math.max(Style.spacing.controlHeight, goneRow.implicitHeight + Style.space(8))
-              radius: Style.space(7)
+              height: Math.max(Math.round(Style.spacing.controlHeight * root.densityScale), goneRow.implicitHeight + root.sp(8))
+              radius: root.sp(7)
               color: Util.alpha(root.fg, goneMouse.containsMouse ? 0.09 : 0.05)
               border.width: goneMouse.containsMouse ? 2 : 1
               border.color: goneMouse.containsMouse ? root.accent : Util.alpha(root.fg, 0.12)
@@ -843,40 +995,40 @@ Panel {
                 id: goneRow
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.left: parent.left
-                anchors.leftMargin: Style.space(10)
+                anchors.leftMargin: root.sp(10)
                 anchors.right: parent.right
-                anchors.rightMargin: Style.space(10)
-                spacing: Style.space(10)
+                anchors.rightMargin: root.sp(10)
+                spacing: root.sp(10)
 
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
                   textFormat: Text.PlainText
                   text: gone.modelData.icon
-                  width: Style.space(22)
+                  width: root.sp(22)
                   horizontalAlignment: Text.AlignHCenter
                   color: root.fg
                   opacity: 0.65
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.body
+                  font.pixelSize: root.fontBody
                 }
 
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
-                  width: parent.width - Style.space(22) - goneKey.width - 2 * parent.spacing
+                  width: parent.width - root.sp(22) - goneKey.width - 2 * parent.spacing
                   textFormat: Text.PlainText
                   text: gone.modelData.label
                   color: root.fg
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.body
+                  font.pixelSize: root.fontBody
                   elide: Text.ElideRight
                 }
 
                 Rectangle {
                   id: goneKey
                   anchors.verticalCenter: parent.verticalCenter
-                  width: Math.max(height, goneKeyText.implicitWidth + Style.space(8))
-                  height: goneKeyText.implicitHeight + Style.space(4)
-                  radius: Style.space(4)
+                  width: Math.max(height, goneKeyText.implicitWidth + root.sp(8))
+                  height: goneKeyText.implicitHeight + root.sp(4)
+                  radius: root.sp(4)
                   color: "transparent"
                   border.width: 1
                   border.color: Util.alpha(root.fg, 0.25)
@@ -888,7 +1040,7 @@ Panel {
                     text: String(gone.index + 1)
                     color: Color.muted
                     font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
+                    font.pixelSize: root.fontCaption
                   }
                 }
               }
@@ -920,10 +1072,10 @@ Panel {
                 textFormat: Text.PlainText
                 color: root.fg
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
+                font.pixelSize: root.fontCaption
                 anchors.left: parent.left
                 anchors.right: staleRowWindows.left
-                anchors.rightMargin: Style.space(10)
+                anchors.rightMargin: root.sp(10)
                 elide: Text.ElideRight
               }
 
@@ -935,7 +1087,7 @@ Panel {
                 color: root.fg
                 opacity: 0.7
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
+                font.pixelSize: root.fontCaption
                 anchors.right: parent.right
               }
             }
@@ -947,7 +1099,7 @@ Panel {
             text: "and " + (root.staleApps.length - root.staleShown) + " more"
             color: Color.muted
             font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
+            font.pixelSize: root.fontCaption
           }
 
           ActionCard {
@@ -970,7 +1122,7 @@ Panel {
         // Lit in the theme's alert color while the service is behind this
         // panel -- the color the bar icon takes, since this is what clears it.
         ActionCard {
-          visible: !root.guideOpen && root.dependencyChecked && !root.ready
+          visible: root.mainView && root.dependencyChecked && !root.ready
           width: content.width
           enabled: !root.installing
           text: root.installing
@@ -984,7 +1136,7 @@ Panel {
 
         // ---------- Frameworks ----------
         SectionLabel {
-          visible: !root.guideOpen && root.ready
+          visible: root.mainView && root.ready
           icon: "󰏘"
           text: "FRAMEWORKS"
         }
@@ -994,12 +1146,12 @@ Panel {
 
           delegate: Rectangle {
             id: row
-            visible: !root.guideOpen && root.ready
+            visible: root.mainView && root.ready
             required property var modelData
             required property int index
             width: content.width
-            height: visible ? Math.max(Style.spacing.controlHeight, rowInner.implicitHeight + Style.space(8)) : 0
-            radius: Style.space(7)
+            height: visible ? Math.max(Math.round(Style.spacing.controlHeight * root.densityScale), rowInner.implicitHeight + root.sp(8)) : 0
+            radius: root.sp(7)
             color: Util.alpha(root.fg, rowMouse.containsMouse ? 0.09 : 0.05)
             border.width: 1
             border.color: root.targetEnabled(row.modelData.target)
@@ -1010,22 +1162,22 @@ Panel {
               id: rowInner
               anchors.verticalCenter: parent.verticalCenter
               anchors.left: parent.left
-              anchors.leftMargin: Style.space(10)
+              anchors.leftMargin: root.sp(10)
               anchors.right: parent.right
-              anchors.rightMargin: Style.space(10)
-              spacing: Style.space(10)
+              anchors.rightMargin: root.sp(10)
+              spacing: root.sp(10)
 
               Text {
                 id: icon
                 anchors.verticalCenter: parent.verticalCenter
                 textFormat: Text.PlainText
                 text: row.modelData.icon
-                width: Style.space(22)
+                width: root.sp(22)
                 horizontalAlignment: Text.AlignHCenter
                 color: root.targetEnabled(row.modelData.target) ? root.accent : root.fg
                 opacity: root.targetEnabled(row.modelData.target) ? 1.0 : 0.65
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.body
+                font.pixelSize: root.fontBody
               }
 
               Text {
@@ -1036,7 +1188,7 @@ Panel {
                 text: row.modelData.label
                 color: root.fg
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.body
+                font.pixelSize: root.fontBody
                 elide: Text.ElideRight
               }
 
@@ -1045,9 +1197,9 @@ Panel {
               Rectangle {
                 id: keyHint
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.max(height, keyHintText.implicitWidth + Style.space(8))
-                height: keyHintText.implicitHeight + Style.space(4)
-                radius: Style.space(4)
+                width: Math.max(height, keyHintText.implicitWidth + root.sp(8))
+                height: keyHintText.implicitHeight + root.sp(4)
+                radius: root.sp(4)
                 color: "transparent"
                 border.width: 1
                 border.color: Util.alpha(root.fg, 0.25)
@@ -1059,7 +1211,7 @@ Panel {
                   text: String(row.index + 1)
                   color: Color.muted
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
+                  font.pixelSize: root.fontCaption
                 }
               }
 
@@ -1082,26 +1234,26 @@ Panel {
         }
 
         Text {
-          visible: !root.guideOpen && root.ready
+          visible: root.mainView && root.ready
           text: "Switching one off restores how it looked before Omarchroma."
           color: Color.muted
           font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
+          font.pixelSize: root.fontCaption
           wrapMode: Text.WordWrap
           width: parent.width
         }
 
-        // Gated on root.ready, not just !guideOpen: these act on a running
+        // Gated on root.ready, not just the main view: these act on a running
         // service, and with none installed they were showing "Refresh
         // enabled" and "Nothing to close" over an otherwise empty panel --
         // controls for a thing that does not exist yet.
         PanelSeparator {
-          visible: !root.guideOpen && root.ready
+          visible: root.mainView && root.ready
           foreground: root.fg
         }
 
         ActionCard {
-          visible: !root.guideOpen && root.ready
+          visible: root.mainView && root.ready
           width: content.width
           text: "Refresh enabled  (r)"
           iconText: "󰑐"
@@ -1112,7 +1264,7 @@ Panel {
         // Reachable by mouse as well as by "/", and carries the count so the
         // number of windows waiting is visible without opening it.
         ActionCard {
-          visible: !root.guideOpen && root.ready
+          visible: root.mainView && root.ready
           width: content.width
           text: root.staleWindowCount > 0
             ? root.windowsPhrase(root.staleWindowCount) + " to close  (/)"
