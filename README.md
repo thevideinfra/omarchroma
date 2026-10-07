@@ -81,8 +81,9 @@ With the bar widget:
 * The color synchronized apps use follows your theme by default. Pick a color
   from the theme's palette in the panel's settings (the gear), or run
   `hyprchroma --set-accent=<name>`; `--set-accent=theme` goes back to following
-  the theme. A chosen color becomes the accent, tints window, header, sidebar
-  and card backgrounds by 8%, and tints the selection color by 25%. It does not
+  the theme. A chosen color becomes the accent, and recolors the window, header,
+  sidebar, card and selection colors: they keep the theme's lightness but take
+  that color's hue. It does not
   change the panel's own look.
 * Removing one hides it from the panel entirely (press `/` and its number to restore).
 * GTK and Qt/KDE are always included; Dark Reader, Flatpak apps and

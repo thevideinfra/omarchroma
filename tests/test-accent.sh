@@ -54,34 +54,40 @@ rm -f "$S/hyprchroma/settings.json"; mkfifo "$S/hyprchroma/settings.json"
 chk "a fifo planted as the settings file does not hang the resolver" "$(accent)" "#111111"
 rm -f "$S/hyprchroma/settings.json"
 
-echo "--- the choice tints surfaces and selection ---"
+echo "--- the choice recolors surfaces and selection ---"
 key() { XDG_CONFIG_HOME=$T XDG_STATE_HOME=$S timeout 5 ./$P "$1"; }
-write_palette optional
+# Dark greys with a little lightness each, so the recolor has something to keep.
+tinted_palette() {
+  write_palette optional
+  sed -i -e 's/^background = .*/background = "#101010"/' \
+         -e 's/^lighter_background = .*/lighter_background = "#202020"/' \
+         -e 's/^dark_background = .*/dark_background = "#0c0c0c"/' \
+         -e 's/^darker_background = .*/darker_background = "#080808"/' \
+         -e 's/^selection = .*/selection = "#202020"/' "$T/hyprchroma/palette.toml"
+}
+tinted_palette
 rm -f "$S/hyprchroma/settings.json"
-chk "no choice: surfaces are the theme's own" "$(key background)" "#000000"
+chk "no choice: surfaces are the theme's own" "$(key background)" "#101010"
 set_accent '{"accent":"theme"}'
-chk "theme: no tint on the background" "$(key background)" "#000000"
-chk "theme: no tint on the selection" "$(key selection)" "#000000"
+chk "theme: surfaces unchanged" "$(key lighter_background)" "#202020"
+chk "theme: selection unchanged" "$(key selection)" "#202020"
 set_accent '{"accent":"red"}'
-chk "red: background tinted 8% (255*0.08 = 20 -> 0x14)" "$(key background)" "#140000"
-chk "...lighter_background too" "$(key lighter_background)" "#140000"
-chk "...dark_background too" "$(key dark_background)" "#140000"
-chk "...darker_background too" "$(key darker_background)" "#140000"
-chk "...selection tinted 25% (255*0.25 = 64 -> 0x40)" "$(key selection)" "#400000"
+chk "red: background keeps its lightness, takes red's hue (saturation capped at 0.5)" "$(key background)" "#180808"
+chk "...lighter_background" "$(key lighter_background)" "#301010"
+chk "...dark_background" "$(key dark_background)" "#120606"
+chk "...darker_background" "$(key darker_background)" "#0c0404"
+chk "...selection: saturation capped at 0.6, lightness lifted a quarter toward red's" "$(key selection)" "#591616"
 chk "...the accent itself is the solid color" "$(key accent)" "#ff0000"
 chk "...text is untouched" "$(key foreground)" "#000000"
 chk "...selection text is untouched" "$(key selection_foreground)" "#000000"
 chk "...muted is untouched" "$(key muted)" "#000000"
 chk "...status colors are untouched" "$(key green)" "#000000"
 set_accent '{"accent":"blue"}'
-chk "blue: background tinted toward blue" "$(key background)" "#000014"
-# A base that is not black, so the mix really blends: 0x10 -> 16*0.92 + 255*0.08.
-sed -i 's/^background = .*/background = "#101010"/' "$T/hyprchroma/palette.toml"
-set_accent '{"accent":"red"}'
-chk "a non-black base blends per channel (16 -> 35, 16 -> 15)" "$(key background)" "#230f0f"
+chk "blue: the same lightness, blue's hue" "$(key background)" "#080818"
+chk "...and the selection" "$(key selection)" "#161659"
 write_palette
 set_accent '{"accent":"cyan"}'
-chk "a color the palette lacks tints nothing" "$(key background)" "#000000"
+chk "a color the palette lacks recolors nothing" "$(key background)" "#000000"
 
 echo "--- every way of asking sees it ---"
 set_accent '{"accent":"blue"}'
@@ -197,5 +203,5 @@ chk "the swatches come from the theme's palette" \
 chk "the panel's own accent is untouched by the choice" \
   "$(grep -c 'readonly property color accent: Color.accent' Panel.qml)" "1"
 chk "the picker says what it changes, and that it leaves the panel alone" \
-  "$(grep -c "Tints windows and headers, highlights selections and accents in synchronized apps. Doesn't change this panel." Panel.qml)" "1"
+  "$(grep -c "Recolors windows, headers and selections, and sets the accent, in synchronized apps. Doesn't change this panel." Panel.qml)" "1"
 chk "the section is called COLOR" "$(grep -c 'text: "COLOR"' Panel.qml)" "1"

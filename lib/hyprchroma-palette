@@ -8,6 +8,7 @@ resolver answers -- which keeps its alias cascade, derived shades and mode
 detection exactly as Omarchy computes them, instead of approximating them
 here and drifting.
 """
+import colorsys
 import hashlib
 import json
 import os
@@ -100,24 +101,29 @@ ACCENT_CHOICES = ("blue", "cyan", "green", "magenta", "yellow", "red", "orange")
 OPTIONAL_ACCENTS = ("cyan", "orange")
 MAX_SETTINGS = 64 * 1024
 
-# The chosen color is mixed into the theme's own colors by these fractions. The
-# surfaces get a little, so windows and headers take a hue while staying dark
-# (or light); the selection gets more, so a selected row is visibly that color.
-# Kept here, named, so the strength can be tuned in one place. selection_foreground
-# is not recomputed, so a strong mix can lower contrast on some themes.
-SURFACE_TINT = 0.08
-SELECTION_TINT = 0.25
+# The chosen color replaces the theme's own hue. Each surface keeps the
+# lightness the theme gave it -- so dark stays dark and readable -- and takes the
+# chosen color's hue and saturation, capped so a vivid color does not make a
+# neon background. The selection also moves a fraction of the way toward the
+# chosen color's lightness, so a selected row stands out as that color. Kept
+# here, named, so the strength can be tuned in one place. selection_foreground
+# is not recomputed, so a strong selection can lower contrast on some themes.
+SURFACE_SATURATION = 0.5
+SELECTION_SATURATION = 0.6
+SELECTION_LIFT = 0.25
 SURFACE_KEYS = ("background", "lighter_background", "dark_background", "darker_background")
 
 
-def mix(base: str, color: str, amount: float) -> str:
-    """base moved `amount` of the way toward color, per sRGB channel."""
-    channels = []
-    for offset in (1, 3, 5):
-        low = int(base[offset:offset + 2], 16)
-        high = int(color[offset:offset + 2], 16)
-        channels.append(round(low * (1 - amount) + high * amount))
-    return "#{:02x}{:02x}{:02x}".format(*channels)
+def recolor(base: str, color: str, saturation_cap: float, lift: float = 0.0) -> str:
+    """base's lightness (moved `lift` of the way toward color's) with color's hue
+    and saturation, the saturation capped."""
+    def channels(value):
+        return [int(value[offset:offset + 2], 16) / 255 for offset in (1, 3, 5)]
+    hue, lightness, saturation = colorsys.rgb_to_hls(*channels(color))
+    _, base_lightness, _ = colorsys.rgb_to_hls(*channels(base))
+    lightness = base_lightness + (lightness - base_lightness) * lift
+    red, green, blue = colorsys.hls_to_rgb(hue, lightness, min(saturation, saturation_cap))
+    return "#{:02x}{:02x}{:02x}".format(*(round(c * 255) for c in (red, green, blue)))
 
 
 def accent_setting() -> str:
@@ -151,8 +157,8 @@ def accent_setting() -> str:
 
 
 def with_accent(resolved: dict) -> dict:
-    """Apply the chosen color: it becomes the accent, and is mixed into the
-    surfaces and the selection. A choice the palette does not define leaves
+    """Apply the chosen color: it becomes the accent, and replaces the hue of
+    the surfaces and the selection. A choice the palette does not define leaves
     everything as the theme has it, so a theme change never leaves this without
     a usable palette."""
     choice = accent_setting()
@@ -160,8 +166,9 @@ def with_accent(resolved: dict) -> dict:
     if color and HEX.match(color):
         resolved["accent"] = color
         for key in SURFACE_KEYS:
-            resolved[key] = mix(resolved[key], color, SURFACE_TINT)
-        resolved["selection"] = mix(resolved["selection"], color, SELECTION_TINT)
+            resolved[key] = recolor(resolved[key], color, SURFACE_SATURATION)
+        resolved["selection"] = recolor(resolved["selection"], color,
+                                        SELECTION_SATURATION, SELECTION_LIFT)
     return resolved
 
 

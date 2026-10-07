@@ -1048,7 +1048,7 @@ Panel {
 
           Text {
             width: settingsView.width
-            text: "Tints windows and headers, highlights selections and accents in synchronized apps. Doesn't change this panel."
+            text: "Recolors windows, headers and selections, and sets the accent, in synchronized apps. Doesn't change this panel."
             color: Color.muted
             font.family: root.fontFamily
             font.pixelSize: root.fontCaption
