@@ -8,3 +8,7 @@ __pycache__/
 *.py[cod]
 
 .claude/worktrees/
+
+# superpowers specs and plans stay out of the repo
+docs/superpowers/
+.superpowers/
